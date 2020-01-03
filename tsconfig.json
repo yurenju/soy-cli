@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "sourceMap": true,
+    "target": "ESNext",
+    "outDir": "build"
+  },
+  "include": ["src/**/*.ts"]
+}
