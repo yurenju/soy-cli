@@ -92,7 +92,9 @@ export class CathayBankParser {
     });
 
     const lines = [];
+    let last;
     csvRecords.forEach(record => {
+      last = record;
       const date = moment(record["日期"], "YYYYMMDD");
       const narration = ["說明", "備註", "特別備註"]
         .map(key => record[key].trim())
@@ -131,12 +133,18 @@ export class CathayBankParser {
           );
         } else {
           lines.push(
-            `  ${baseAccount} ${record["提出"]} TWD`,
-            `  ${defaultAccount.withdraw}\n`
+            `  ${defaultAccount.withdraw} ${record["提出"]} TWD`,
+            `  ${baseAccount}\n`
           );
         }
       }
     });
+
+    const balance = last["餘額"];
+    const date = moment(last["日期"], "YYYYMMDD")
+      .add(1, "day")
+      .format("YYYY-MM-DD");
+    lines.push(`${date} balance ${baseAccount} ${balance} TWD\n`);
 
     return lines.join("\n");
   }
