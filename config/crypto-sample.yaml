@@ -10,5 +10,21 @@ rules:
   - type: ethereum
     to: "0x6ab5bc70622763f270220127189f3e61237ae1f2"
     account: Assets:Crypto:DaiSaving
+coins:
+  - symbol: BAT
+    id: basic-attention-token
+  - symbol: ETH
+    id: ethereum
+  - symbol: USDC
+    id: usd-coin
+  - symbol: USDT
+    id: tether
+  - symbol: DAI
+    id: dai
+  - symbol: CDAI
+    id: compound-dai
+  - symbol: CUSDC
+    id: compound-usd-coin
+fiat: TWD
 timestamp:
   ethereum: 0
