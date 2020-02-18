@@ -6,6 +6,8 @@ import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import Bottleneck from "bottleneck";
 import { Config } from "../Config";
+import Directive from "./Directive";
+import BeanTransaction from "./BeanTransaction";
 
 dotenv.config();
 
@@ -23,81 +25,6 @@ const cgcLmt = new Bottleneck({
 });
 
 const decimals = new BigNumber(10).pow(18);
-
-class BeanTransaction {
-  date: string;
-  flag: string;
-  payee: string;
-  narration: string;
-  attributes: { [key: string]: string };
-  directives: Directive[];
-
-  constructor(
-    date = moment().format("YYYY-MM-DD"),
-    flag = "*",
-    payee = "",
-    narration = "",
-    directives = [],
-    attributes = {}
-  ) {
-    this.date = date;
-    this.flag = flag;
-    this.payee = payee;
-    this.narration = narration;
-    this.directives = directives;
-    this.attributes = attributes;
-  }
-
-  toString() {
-    const { date, flag, payee, narration, directives, attributes } = this;
-    const lines = [];
-    const firstArr = [date, flag];
-    if (payee) {
-      firstArr.push(`"${payee}"`);
-    }
-    if (narration) {
-      firstArr.push(`"${narration}"`);
-    }
-    const attrsLines = Object.entries(attributes).map(
-      ([key, value]) => `  ${key}: "${value}"`
-    );
-
-    lines.push(firstArr.join(" "));
-    lines.push(...attrsLines);
-    lines.push(...directives.map(d => d.toString()));
-
-    return lines.join("\n");
-  }
-}
-
-class Directive {
-  account: string;
-  amount: string;
-  cost: string;
-  price: string;
-  symbol: string;
-
-  constructor(account = "", amount = "", symbol = "", cost = "", price = "") {
-    this.account = account;
-    this.amount = amount;
-    this.symbol = symbol;
-    this.cost = cost;
-    this.price = price;
-  }
-
-  toString() {
-    const { account, amount, symbol, cost, price } = this;
-    const strArr = [account, amount, symbol];
-    if (cost || amount[0] === "-") {
-      strArr.push(`{${cost}}`);
-    }
-    if (price) {
-      strArr.push(`@ ${price}`);
-    }
-
-    return "  " + strArr.join(" ");
-  }
-}
 
 enum EthTxType {
   EthTransfer = "ETH Transfer",
@@ -189,7 +116,7 @@ export class CryptoParser {
       // to:
       //   Assets:Crypto:Wallet:SAI -20 SAI
       //   Assets:Crypto:Wallet:CSAI 100 CSAI
-      if (fromConn || transfers.length <= 1) {
+      if ((fromConn || transfers.length <= 1) && value !== "0") {
         dirs.push(
           this.getDirective(
             "-",
@@ -201,7 +128,7 @@ export class CryptoParser {
           )
         );
       }
-      if (toConn || transfers.length <= 1) {
+      if ((toConn || transfers.length <= 1) && value !== "0") {
         dirs.push(
           this.getDirective(
             "",
@@ -252,6 +179,9 @@ export class CryptoParser {
           .schedule(() => fetch(url).then(res => res.json()))
           .then((json: any) => {
             json.date = date;
+            if (json.error) {
+              json.id = id;
+            }
             return json;
           });
         tasks.push(task);
@@ -259,8 +189,18 @@ export class CryptoParser {
     });
     const results = await Promise.all(tasks);
     results.forEach(result => {
-      const { date, id, symbol } = result;
+      const { date, id, symbol, error } = result;
+      if (error) {
+        console.error(`cannot find ${id} at ${date}`);
+        return;
+      }
       map[date][id].forEach(dir => {
+        if (!result.market_data) {
+          console.error(
+            `unexpected result: ${JSON.stringify(result, null, 2)}`
+          );
+          return;
+        }
         if (dir.amount[0] !== "-" && dir.symbol === symbol.toUpperCase()) {
           dir.cost = `${
             result.market_data.current_price[fiat.toLowerCase()]
@@ -308,9 +248,7 @@ export class CryptoParser {
         tokenRes.result.forEach(async (transfer, i, arr) => {
           console.log(`  process ERC20 tx (${i + 1} / ${arr.length})`);
           transfer.from = transfer.from.toLowerCase();
-          transfer.tokenSymbol = transfer.tokenSymbol
-            .toUpperCase()
-            .replace(/[^\w]/, "");
+          transfer.tokenSymbol = transfer.tokenSymbol.toUpperCase();
           if (!tokensMetadata[transfer.tokenSymbol]) {
             tokensMetadata[transfer.tokenSymbol] = {
               contractAddress: transfer.contractAddress,
@@ -401,8 +339,8 @@ export class CryptoParser {
 
       const narration = type;
       const beanTx = new BeanTransaction(date, "*", "", narration);
-      const { directives, attributes } = beanTx;
-      attributes["tx"] = hash;
+      const { directives, metadata } = beanTx;
+      metadata["tx"] = hash;
 
       const fromConn = this.getConnection(from, connections);
 
@@ -448,6 +386,27 @@ export class CryptoParser {
           )
         );
       }
+
+      beanTx.directives.forEach(dir => {
+        const { rules } = this.config;
+        rules.forEach(rule => {
+          const matched = Object.entries(rule.pattern).some(
+            ([key, value]) => dir[key] === value
+          );
+
+          if (matched) {
+            rule.transform.forEach(({ field, value }) => {
+              if (field === "symbol") {
+                const regex = new RegExp(`${dir.symbol}$`);
+                dir.account = dir.account.replace(regex, value);
+              }
+
+              dir[field] = value;
+            });
+          }
+        });
+      });
+
       beanTxns.push(beanTx);
     });
 
