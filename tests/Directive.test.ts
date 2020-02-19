@@ -1,4 +1,4 @@
-import Directive from "../src/parsers/Directive";
+import Directive from "../src/Directive";
 import { expect } from "chai";
 
 describe("Directive", () => {

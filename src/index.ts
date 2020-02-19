@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { Config } from "./Config";
-import { CathayBankParser } from "./parsers/CathayBankParser";
-import { CryptoParser } from "./parsers/CryptoParser";
+import { CathayBankParser } from "./CathayBankParser";
+import { CryptoParser } from "./CryptoParser";
 
 const program = new Command();
 

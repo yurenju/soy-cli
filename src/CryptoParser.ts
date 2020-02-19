@@ -5,7 +5,7 @@ import BigNumber from "bignumber.js";
 import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import Bottleneck from "bottleneck";
-import { Config } from "../Config";
+import { Config } from "./Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
 

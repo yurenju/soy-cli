@@ -4,7 +4,7 @@ import path, { basename } from "path";
 import * as iconv from "iconv-lite";
 import parse from "csv-parse/lib/sync";
 import moment from "moment";
-import { Config } from "../Config";
+import { Config } from "./Config";
 
 enum TxType {
   Deposit = "deposit",

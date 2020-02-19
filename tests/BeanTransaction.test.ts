@@ -1,5 +1,5 @@
-import Directive from "../src/parsers/Directive";
-import BeanTransaction from "../src/parsers/BeanTransaction";
+import Directive from "../src/Directive";
+import BeanTransaction from "../src/BeanTransaction";
 import { expect } from "chai";
 
 describe("BeanTransaction", () => {
