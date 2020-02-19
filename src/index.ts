@@ -1,5 +1,5 @@
+import "reflect-metadata";
 import { Command } from "commander";
-import { Config } from "./Config";
 import { CathayBankParser } from "./CathayBankParser";
 import { CryptoParser } from "./CryptoParser";
 

@@ -5,9 +5,11 @@ import BigNumber from "bignumber.js";
 import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import Bottleneck from "bottleneck";
+import { plainToClass } from "class-transformer";
 import { Config } from "./Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
+import CryptoConfig from "./CryptoConfig";
 
 dotenv.config();
 
@@ -34,15 +36,15 @@ enum EthTxType {
 }
 
 export class CryptoParser {
-  config: Config;
+  config: CryptoConfig;
 
   static command = "crypto";
   static options = ["-c, --config <config-file>"];
   static envs = ["ETHERSCAN_API_KEY"];
 
   constructor(options: any) {
-    this.config = Config.parse(options.config);
-    this.config["outputDir"] = process.cwd();
+    this.config = plainToClass(CryptoConfig, Config.parse(options.config));
+    this.config.outputDir = process.cwd();
   }
 
   getValue(value: string, tokenDecimal: string): string {
