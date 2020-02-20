@@ -6,10 +6,10 @@ import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import Bottleneck from "bottleneck";
 import { plainToClass } from "class-transformer";
-import { Config } from "./Config";
+import { Config, DefaultAccount } from "./Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
-import CryptoConfig from "./CryptoConfig";
+import { CryptoConfig, Connection } from "./CryptoConfig";
 
 dotenv.config();
 
@@ -28,11 +28,40 @@ const cgcLmt = new Bottleneck({
 
 const decimals = new BigNumber(10).pow(18);
 
-enum EthTxType {
-  EthTransfer = "ETH Transfer",
-  ERC20Transfer = "ERC20 Transfer",
-  ERC20Exchange = "ERC20 Exchange",
-  ContractExecution = "Contract Execution"
+interface TokenMetadata {
+  contractAddress: string;
+  tokenDecimal: string;
+}
+
+interface TokenMetadataMap {
+  [symbol: string]: TokenMetadata;
+}
+
+interface ERC20Transfer {
+  from: string;
+  to: string;
+  tokenSymbol: string;
+  tokenDecimal: string;
+  value: string;
+  timeStamp: string;
+  hash: string;
+  contractAddress: string;
+}
+
+interface EthTx {
+  hash: string;
+  transfers: ERC20Transfer[];
+  value: string;
+  timeStamp: string;
+  blockNumber: string;
+  from: string;
+  to: string;
+  gasUsed: string;
+  gasPrice: string;
+}
+
+interface EthTxMap {
+  [hash: string]: EthTx;
 }
 
 export class CryptoParser {
@@ -52,7 +81,7 @@ export class CryptoParser {
     return new BigNumber(value).div(decimals).toFormat();
   }
 
-  getConnection(addr: string, conns: any[]) {
+  getConnection(addr: string, conns: Connection[]) {
     for (let i = 0; i < conns.length; i++) {
       if (conns[i].address.toLowerCase() === addr) {
         return conns[i];
@@ -66,7 +95,7 @@ export class CryptoParser {
     sign: string,
     value: string,
     tokenDecimal: string,
-    conn: any,
+    conn: Connection,
     tokenSymbol: string,
     defaultAccount: string
   ) {
@@ -92,6 +121,7 @@ export class CryptoParser {
     return {
       from: txResult.from,
       to: txResult.to,
+      blockNumber: new BigNumber(receiptResult.blockNumber).toString(),
       gasUsed: new BigNumber(receiptResult.gasUsed).toString(),
       gasPrice: new BigNumber(txResult.getPrice).toString(),
       hash: txResult.hash,
@@ -101,7 +131,108 @@ export class CryptoParser {
     };
   }
 
-  getERC20Driectives(transfers: any[], conns: any[], defaultAccount: any) {
+  async getBalances(
+    lastTx: EthTx,
+    tokensMetadata: TokenMetadataMap,
+    conn: Connection
+  ): Promise<string[]> {
+    const balances = [];
+    const apikey = process.env.ETHERSCAN_API_KEY;
+    const { blockNumber, timeStamp } = lastTx;
+    const tag = parseInt(blockNumber).toString(16);
+    const date = moment(parseInt(timeStamp) * 1000)
+      .add(1, "day")
+      .format("YYYY-MM-DD");
+
+    const meta = Object.entries(tokensMetadata);
+    for (let j = 0; j < meta.length; j++) {
+      const [symbol, info] = meta[j];
+      const { contractAddress, tokenDecimal } = info;
+      const balanceUrl =
+        `${ETHERSCAN_BASE_URL}?module=account&action=tokenbalance` +
+        `&contractaddress=${contractAddress}&address=${conn.address}&tag=${tag}&apikey=${apikey}`;
+      const { result } = await ethscanLmt.schedule(() =>
+        fetch(balanceUrl).then(res => res.json())
+      );
+      const balance = this.getValue(result, tokenDecimal);
+      const account = `${conn.accountPrefix}:${symbol}`;
+      balances.push(`${date} balance ${account} ${balance} ${symbol}`);
+    }
+
+    return balances;
+  }
+
+  async normalizeTransfers(
+    txMap: EthTxMap,
+    transfers: ERC20Transfer[],
+    tokensMetadata: TokenMetadataMap
+  ) {
+    for (let i = 0; i < transfers.length; i++) {
+      const transfer = transfers[i];
+      console.log(`  process ERC20 tx (${i + 1} / ${transfers.length})`);
+      transfer.from = transfer.from.toLowerCase();
+      transfer.tokenSymbol = transfer.tokenSymbol.toUpperCase();
+      if (!tokensMetadata[transfer.tokenSymbol]) {
+        tokensMetadata[transfer.tokenSymbol] = {
+          contractAddress: transfer.contractAddress,
+          tokenDecimal: transfer.tokenDecimal
+        };
+      }
+
+      if (!txMap[transfer.hash]) {
+        const tx = await this.getTransaction(transfer.hash);
+        tx.timeStamp = transfer.timeStamp;
+        txMap[transfer.hash] = tx;
+      }
+
+      const tx = txMap[transfer.hash];
+      const duplicated = tx.transfers.some(
+        tr =>
+          tr.from === transfer.from &&
+          tr.to === transfer.to &&
+          tr.value === transfer.value
+      );
+
+      if (!duplicated) {
+        tx.transfers.push(transfer);
+      }
+    }
+  }
+
+  getETHDirectives(
+    from: string,
+    to: string,
+    value: string,
+    defaultAccount: DefaultAccount
+  ): Directive[] {
+    const { connections } = this.config;
+    const fromConn = this.getConnection(from, connections);
+    const toConn = this.getConnection(to, connections);
+    const directives = [];
+
+    directives.push(
+      this.getDirective(
+        "-",
+        value,
+        "18",
+        fromConn,
+        "ETH",
+        defaultAccount.deposit
+      )
+    );
+
+    directives.push(
+      this.getDirective("", value, "18", toConn, "ETH", defaultAccount.withdraw)
+    );
+
+    return directives;
+  }
+
+  getERC20Driectives(
+    transfers: ERC20Transfer[],
+    conns: Connection[],
+    defaultAccount: DefaultAccount
+  ) {
     const dirs = [];
     transfers.forEach(transfer => {
       const { from, to, tokenSymbol, tokenDecimal, value } = transfer;
@@ -145,6 +276,26 @@ export class CryptoParser {
     });
 
     return dirs;
+  }
+
+  patternReplace(dir: Directive) {
+    const { rules } = this.config;
+    rules.forEach(rule => {
+      const matched = Object.entries(rule.pattern).some(
+        ([key, value]) => dir[key] === value
+      );
+
+      if (matched) {
+        rule.transform.forEach(({ field, value }) => {
+          if (field === "symbol") {
+            const regex = new RegExp(`${dir.symbol}$`);
+            dir.account = dir.account.replace(regex, value);
+          }
+
+          dir[field] = value;
+        });
+      }
+    });
   }
 
   async fillPrices(beans: BeanTransaction[]) {
@@ -212,14 +363,31 @@ export class CryptoParser {
     });
   }
 
+  getNarration(tx: EthTx): string {
+    let narration = "";
+    if (tx.transfers.length === 0) {
+      if (tx.value === "0") {
+        narration = "Contract Execution";
+      } else {
+        narration = "ETH Transfer";
+      }
+    } else if (tx.transfers.length <= 1) {
+      narration = "ERC20 Transfer";
+    } else {
+      narration = "ERC20 Exechange";
+    }
+
+    return narration;
+  }
+
   async roasteBean(): Promise<string> {
     const { connections, defaultAccount } = this.config;
     const beanTxns: BeanTransaction[] = [];
-    const ethTxnMap: { [hash: string]: any } = {};
+    const ethTxnMap: EthTxMap = {};
     const apikey = process.env.ETHERSCAN_API_KEY;
-    const tokensMetadata = {};
     const balances = [];
     for (let i = 0; i < connections.length; i++) {
+      const tokensMetadata: TokenMetadataMap = {};
       const conn = connections[i];
       console.log(`Process ${conn.accountPrefix}`);
 
@@ -234,82 +402,29 @@ export class CryptoParser {
           fetch(tokentxUrl).then(res => res.json())
         );
 
+        // convert to map
         txlistRes.result.forEach(tx => {
           if (!ethTxnMap[tx.hash]) {
             ethTxnMap[tx.hash] = tx;
             tx.transfers = [];
-            tx.type =
-              tx.value === "0"
-                ? EthTxType.ContractExecution
-                : EthTxType.EthTransfer;
-          } else {
-            ethTxnMap[tx.hash].value = tx.value;
           }
         });
 
-        tokenRes.result.forEach(async (transfer, i, arr) => {
-          console.log(`  process ERC20 tx (${i + 1} / ${arr.length})`);
-          transfer.from = transfer.from.toLowerCase();
-          transfer.tokenSymbol = transfer.tokenSymbol.toUpperCase();
-          if (!tokensMetadata[transfer.tokenSymbol]) {
-            tokensMetadata[transfer.tokenSymbol] = {
-              contractAddress: transfer.contractAddress,
-              tokenDecimal: transfer.tokenDecimal
-            };
-          }
+        await this.normalizeTransfers(
+          ethTxnMap,
+          tokenRes.result,
+          tokensMetadata
+        );
 
-          if (!ethTxnMap[transfer.hash]) {
-            const tx = await this.getTransaction(transfer.hash);
-            tx.timeStamp = transfer.timeStamp;
-            ethTxnMap[transfer.hash] = tx;
-          }
-
-          const tx = ethTxnMap[transfer.hash];
-          const duplicated = tx.transfers.some(
-            tr =>
-              tr.from === transfer.from &&
-              tr.to === transfer.to &&
-              tr.value === transfer.value
-          );
-
-          if (!duplicated) {
-            tx.transfers.push(transfer);
-            tx.type =
-              tx.transfers.length <= 1
-                ? EthTxType.ERC20Transfer
-                : EthTxType.ERC20Exchange;
-          }
-        });
-
-        // const lastTokenTx = tokenRes.result.slice().pop();
-        // const lastTx = txlistRes.result
-        //   .slice()
-        //   .pop()
+        // get last balance
         const lastTx = [tokenRes, txlistRes]
           .map(res => res.result.slice().pop())
           .sort((a, b) => parseInt(a.blockNumber) - parseInt(b.blockNumber))
           .pop();
 
-        const { blockNumber, timeStamp } = lastTx;
-        const tag = parseInt(blockNumber).toString(16);
-        const date = moment(parseInt(timeStamp) * 1000)
-          .add(1, "day")
-          .format("YYYY-MM-DD");
-
-        const meta = Object.entries(tokensMetadata);
-        for (let j = 0; j < meta.length; j++) {
-          const [symbol, info]: [string, any] = meta[j];
-          const { contractAddress, tokenDecimal } = info;
-          const balanceUrl =
-            `${ETHERSCAN_BASE_URL}?module=account&action=tokenbalance` +
-            `&contractaddress=${contractAddress}&address=${conn.address}&tag=${tag}&apikey=${apikey}`;
-          const { result } = await ethscanLmt.schedule(() =>
-            fetch(balanceUrl).then(res => res.json())
-          );
-          const balance = this.getValue(result, tokenDecimal);
-          const account = `${conn.accountPrefix}:${symbol}`;
-          balances.push(`${date} balance ${account} ${balance} ${symbol}`);
-        }
+        balances.push(
+          ...(await this.getBalances(lastTx, tokensMetadata, conn))
+        );
       }
     }
 
@@ -326,8 +441,7 @@ export class CryptoParser {
         timeStamp,
         gasUsed,
         gasPrice,
-        hash,
-        type
+        hash
       } = tx;
 
       const date = moment(parseInt(timeStamp) * 1000).format("YYYY-MM-DD");
@@ -339,7 +453,7 @@ export class CryptoParser {
 
       const val = new BigNumber(value).div(decimals).toString();
 
-      const narration = type;
+      const narration = this.getNarration(tx);
       const beanTx = new BeanTransaction(date, "*", "", narration);
       const { directives, metadata } = beanTx;
       metadata["tx"] = hash;
@@ -362,53 +476,14 @@ export class CryptoParser {
         );
         directives.push(...dirs);
       }
+
+      // EtH Transfer
       if (val !== "0") {
-        const fromConn = this.getConnection(from, connections);
-        const toConn = this.getConnection(to, connections);
-
-        directives.push(
-          this.getDirective(
-            "-",
-            value,
-            "18",
-            fromConn,
-            "ETH",
-            defaultAccount.deposit
-          )
-        );
-
-        directives.push(
-          this.getDirective(
-            "",
-            value,
-            "18",
-            toConn,
-            "ETH",
-            defaultAccount.withdraw
-          )
-        );
+        const dirs = this.getETHDirectives(from, to, value, defaultAccount);
+        directives.push(...dirs);
       }
 
-      beanTx.directives.forEach(dir => {
-        const { rules } = this.config;
-        rules.forEach(rule => {
-          const matched = Object.entries(rule.pattern).some(
-            ([key, value]) => dir[key] === value
-          );
-
-          if (matched) {
-            rule.transform.forEach(({ field, value }) => {
-              if (field === "symbol") {
-                const regex = new RegExp(`${dir.symbol}$`);
-                dir.account = dir.account.replace(regex, value);
-              }
-
-              dir[field] = value;
-            });
-          }
-        });
-      });
-
+      beanTx.directives.forEach(dir => this.patternReplace(dir));
       beanTxns.push(beanTx);
     });
 

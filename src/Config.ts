@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import * as yaml from "js-yaml";
 
-interface DefaultAccount {
+export interface DefaultAccount {
   deposit: string;
   withdraw: string;
   base?: string;

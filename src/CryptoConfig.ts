@@ -1,33 +1,33 @@
 import { Config } from "./Config";
 
-interface Connection {
+export interface Connection {
   type: string;
   address: string;
   accountPrefix: string;
 }
 
-interface Pattern {
+export interface Pattern {
   symbol?: string;
   to?: string;
 }
 
-interface Transform {
+export interface Transform {
   field: string;
   value: string;
 }
 
-interface Rule {
+export interface Rule {
   type: string;
   pattern: Pattern;
   transform: Transform[];
 }
 
-interface Coin {
+export interface Coin {
   symbol: string;
   id: string;
 }
 
-export default class CryptoConfig extends Config {
+export class CryptoConfig extends Config {
   connections: Connection[];
   rules: Rule[];
   timestamp: { ethereum: string };
