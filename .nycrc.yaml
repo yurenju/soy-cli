@@ -1,0 +1,7 @@
+include: 
+  - src/**/*.ts
+all: true
+reporter:
+  - html
+  - text
+  - lcov

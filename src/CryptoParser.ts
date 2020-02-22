@@ -444,7 +444,6 @@ export class CryptoParser {
     mkdir("-p", outputDir);
     const beansContent = await this.roasteBean();
     this.writeBeanFile(beansContent, outputDir);
-    process.exit(0);
   }
 
   writeBeanFile(content: string, outputDir: string) {
