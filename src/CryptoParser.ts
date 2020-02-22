@@ -10,16 +10,11 @@ import { Config, DefaultAccount } from "./Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
 import { CryptoConfig, Connection } from "./CryptoConfig";
+import { EthTx, ERC20Transfer, Etherscan } from "./Etherscan";
 
 dotenv.config();
 
-const ETHERSCAN_BASE_URL = "https://api.etherscan.io/api";
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
-
-const ethscanLmt = new Bottleneck({
-  maxConcurrent: 1,
-  minTime: 200
-});
 
 const cgcLmt = new Bottleneck({
   maxConcurrent: 1,
@@ -37,35 +32,13 @@ interface TokenMetadataMap {
   [symbol: string]: TokenMetadata;
 }
 
-interface ERC20Transfer {
-  from: string;
-  to: string;
-  tokenSymbol: string;
-  tokenDecimal: string;
-  value: string;
-  timeStamp: string;
-  hash: string;
-  contractAddress: string;
-}
-
-interface EthTx {
-  hash: string;
-  transfers: ERC20Transfer[];
-  value: string;
-  timeStamp: string;
-  blockNumber: string;
-  from: string;
-  to: string;
-  gasUsed: string;
-  gasPrice: string;
-}
-
 interface EthTxMap {
   [hash: string]: EthTx;
 }
 
 export class CryptoParser {
   config: CryptoConfig;
+  private readonly etherscan: Etherscan;
 
   static command = "crypto";
   static options = ["-c, --config <config-file>"];
@@ -74,6 +47,7 @@ export class CryptoParser {
   constructor(options: any) {
     this.config = plainToClass(CryptoConfig, Config.parse(options.config));
     this.config.outputDir = process.cwd();
+    this.etherscan = new Etherscan(process.env.ETHERSCAN_API_KEY);
   }
 
   getValue(value: string, tokenDecimal: string): string {
@@ -107,39 +81,13 @@ export class CryptoParser {
     return new Directive(account, amount, tokenSymbol);
   }
 
-  async getTransaction(hash: string) {
-    console.log(`    getting tx ${hash}`);
-    const apikey = process.env.ETHERSCAN_API_KEY;
-    const txurl = `${ETHERSCAN_BASE_URL}?module=proxy&action=eth_getTransactionByHash&txhash=${hash}&apikey=${apikey}`;
-    const receipturl = `${ETHERSCAN_BASE_URL}?module=proxy&action=eth_getTransactionReceipt&txhash=${hash}&apikey=${apikey}`;
-    const { result: txResult } = await ethscanLmt.schedule(() =>
-      fetch(txurl).then(res => res.json())
-    );
-    const { result: receiptResult } = await ethscanLmt.schedule(() =>
-      fetch(receipturl).then(res => res.json())
-    );
-    return {
-      from: txResult.from,
-      to: txResult.to,
-      blockNumber: new BigNumber(receiptResult.blockNumber).toString(),
-      gasUsed: new BigNumber(receiptResult.gasUsed).toString(),
-      gasPrice: new BigNumber(txResult.getPrice).toString(),
-      hash: txResult.hash,
-      value: new BigNumber(txResult.value).toString(),
-      timeStamp: "",
-      transfers: []
-    };
-  }
-
   async getBalances(
     lastTx: EthTx,
     tokensMetadata: TokenMetadataMap,
     conn: Connection
   ): Promise<string[]> {
     const balances = [];
-    const apikey = process.env.ETHERSCAN_API_KEY;
     const { blockNumber, timeStamp } = lastTx;
-    const tag = parseInt(blockNumber).toString(16);
     const date = moment(parseInt(timeStamp) * 1000)
       .add(1, "day")
       .format("YYYY-MM-DD");
@@ -148,11 +96,10 @@ export class CryptoParser {
     for (let j = 0; j < meta.length; j++) {
       const [symbol, info] = meta[j];
       const { contractAddress, tokenDecimal } = info;
-      const balanceUrl =
-        `${ETHERSCAN_BASE_URL}?module=account&action=tokenbalance` +
-        `&contractaddress=${contractAddress}&address=${conn.address}&tag=${tag}&apikey=${apikey}`;
-      const { result } = await ethscanLmt.schedule(() =>
-        fetch(balanceUrl).then(res => res.json())
+      const result = await this.etherscan.getTokenBalance(
+        contractAddress,
+        conn.address,
+        blockNumber
       );
       const balance = this.getValue(result, tokenDecimal);
       const account = `${conn.accountPrefix}:${symbol}`;
@@ -180,7 +127,7 @@ export class CryptoParser {
       }
 
       if (!txMap[transfer.hash]) {
-        const tx = await this.getTransaction(transfer.hash);
+        const tx = await this.etherscan.getTransaction(transfer.hash);
         tx.timeStamp = transfer.timeStamp;
         txMap[transfer.hash] = tx;
       }
@@ -393,14 +340,8 @@ export class CryptoParser {
 
       if (conn.type === "ethereum") {
         const address = conn.address.toLowerCase();
-        const txlistUrl = `${ETHERSCAN_BASE_URL}?module=account&action=txlist&address=${address}&apikey=${apikey}`;
-        const tokentxUrl = `${ETHERSCAN_BASE_URL}?module=account&action=tokentx&address=${address}&apikey=${apikey}`;
-        const txlistRes: any = await ethscanLmt.schedule(() =>
-          fetch(txlistUrl).then(res => res.json())
-        );
-        const tokenRes: any = await ethscanLmt.schedule(() =>
-          fetch(tokentxUrl).then(res => res.json())
-        );
+        const txlistRes: any = await this.etherscan.getTxList(address);
+        const tokenRes: any = await this.etherscan.getErc20TxList(address);
 
         // convert to map
         txlistRes.result.forEach(tx => {
