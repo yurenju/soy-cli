@@ -327,11 +327,66 @@ export class CryptoParser {
     return narration;
   }
 
-  async roasteBean(): Promise<string> {
+  toBeanTx(tx: EthTx) {
+    const {
+      value,
+      transfers,
+      from,
+      to,
+      timeStamp,
+      gasUsed,
+      gasPrice,
+      hash
+    } = tx;
     const { connections, defaultAccount } = this.config;
+
+    const date = moment(parseInt(timeStamp) * 1000).format("YYYY-MM-DD");
+
+    const gas = new BigNumber(gasUsed)
+      .multipliedBy(gasPrice)
+      .div(decimals)
+      .toString();
+
+    const val = new BigNumber(value).div(decimals).toString();
+
+    const narration = this.getNarration(tx);
+    const beanTx = new BeanTransaction(date, "*", "", narration);
+    const { directives, metadata } = beanTx;
+    metadata["tx"] = hash;
+
+    const fromConn = this.getConnection(from, connections);
+
+    if (fromConn) {
+      directives.push(
+        new Directive(defaultAccount.ethTx, gas, "ETH"),
+        new Directive(`${fromConn.accountPrefix}:ETH`, `-${gas}`, "ETH")
+      );
+    }
+
+    // ERC20 transfer or exchange
+    if (transfers) {
+      const dirs = this.getERC20Driectives(
+        transfers,
+        connections,
+        defaultAccount
+      );
+      directives.push(...dirs);
+    }
+
+    // EtH Transfer
+    if (val !== "0") {
+      const dirs = this.getETHDirectives(from, to, value, defaultAccount);
+      directives.push(...dirs);
+    }
+
+    beanTx.directives.forEach(dir => this.patternReplace(dir));
+    return beanTx;
+  }
+
+  async roasteBean(): Promise<string> {
+    const { connections } = this.config;
     const beanTxns: BeanTransaction[] = [];
     const ethTxnMap: EthTxMap = {};
-    const apikey = process.env.ETHERSCAN_API_KEY;
     const balances = [];
     for (let i = 0; i < connections.length; i++) {
       const tokensMetadata: TokenMetadataMap = {};
@@ -373,60 +428,7 @@ export class CryptoParser {
       (a, b) => parseInt(a.timeStamp) - parseInt(b.timeStamp)
     );
 
-    txlist.forEach(tx => {
-      const {
-        value,
-        transfers,
-        from,
-        to,
-        timeStamp,
-        gasUsed,
-        gasPrice,
-        hash
-      } = tx;
-
-      const date = moment(parseInt(timeStamp) * 1000).format("YYYY-MM-DD");
-
-      const gas = new BigNumber(gasUsed)
-        .multipliedBy(gasPrice)
-        .div(decimals)
-        .toString();
-
-      const val = new BigNumber(value).div(decimals).toString();
-
-      const narration = this.getNarration(tx);
-      const beanTx = new BeanTransaction(date, "*", "", narration);
-      const { directives, metadata } = beanTx;
-      metadata["tx"] = hash;
-
-      const fromConn = this.getConnection(from, connections);
-
-      if (fromConn) {
-        directives.push(
-          new Directive(defaultAccount.ethTx, gas, "ETH"),
-          new Directive(`${fromConn.accountPrefix}:ETH`, `-${gas}`, "ETH")
-        );
-      }
-
-      // ERC20 transfer or exchange
-      if (transfers) {
-        const dirs = this.getERC20Driectives(
-          transfers,
-          connections,
-          defaultAccount
-        );
-        directives.push(...dirs);
-      }
-
-      // EtH Transfer
-      if (val !== "0") {
-        const dirs = this.getETHDirectives(from, to, value, defaultAccount);
-        directives.push(...dirs);
-      }
-
-      beanTx.directives.forEach(dir => this.patternReplace(dir));
-      beanTxns.push(beanTx);
-    });
+    beanTxns.push(...txlist.map(tx => this.toBeanTx(tx)));
 
     await this.fillPrices(beanTxns);
     return (
