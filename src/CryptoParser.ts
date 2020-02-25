@@ -23,12 +23,12 @@ const cgcLmt = new Bottleneck({
 
 const decimals = new BigNumber(10).pow(18);
 
-interface TokenMetadata {
+export interface TokenMetadata {
   contractAddress: string;
   tokenDecimal: string;
 }
 
-interface TokenMetadataMap {
+export interface TokenMetadataMap {
   [symbol: string]: TokenMetadata;
 }
 
@@ -36,15 +36,19 @@ interface EthTxMap {
   [hash: string]: EthTx;
 }
 
+interface Options {
+  config: string;
+}
+
 export class CryptoParser {
   config: CryptoConfig;
-  private readonly etherscan: Etherscan;
+  etherscan: Etherscan;
 
   static command = "crypto";
   static options = ["-c, --config <config-file>"];
   static envs = ["ETHERSCAN_API_KEY"];
 
-  constructor(options: any) {
+  constructor(options: Options) {
     this.config = plainToClass(CryptoConfig, Config.parse(options.config));
     this.config.outputDir = process.cwd();
     this.etherscan = new Etherscan(process.env.ETHERSCAN_API_KEY);
@@ -55,9 +59,10 @@ export class CryptoParser {
     return new BigNumber(value).div(decimals).toFormat();
   }
 
-  getConnection(addr: string, conns: Connection[]) {
+  getConnection(addr: string): Connection {
+    const { connections: conns } = this.config;
     for (let i = 0; i < conns.length; i++) {
-      if (conns[i].address.toLowerCase() === addr) {
+      if (conns[i].address.toLowerCase() === addr.toLowerCase()) {
         return conns[i];
       }
     }
@@ -65,20 +70,12 @@ export class CryptoParser {
     return null;
   }
 
-  getDirective(
-    sign: string,
-    value: string,
-    tokenDecimal: string,
-    conn: Connection,
-    tokenSymbol: string,
+  getAccount(
+    prefix: string | undefined,
+    symbol: string,
     defaultAccount: string
-  ) {
-    const val = this.getValue(value, tokenDecimal);
-    const account = conn
-      ? `${conn.accountPrefix}:${tokenSymbol}`
-      : defaultAccount;
-    const amount = `${sign}${val}`;
-    return new Directive(account, amount, tokenSymbol);
+  ): string {
+    return prefix !== undefined ? `${prefix}:${symbol}` : defaultAccount;
   }
 
   async getBalances(
@@ -86,8 +83,9 @@ export class CryptoParser {
     tokensMetadata: TokenMetadataMap,
     conn: Connection
   ): Promise<string[]> {
-    const balances = [];
     const { blockNumber, timeStamp } = lastTx;
+    const { accountPrefix, address } = conn;
+    const balances = [];
     const date = moment(parseInt(timeStamp) * 1000)
       .add(1, "day")
       .format("YYYY-MM-DD");
@@ -98,11 +96,11 @@ export class CryptoParser {
       const { contractAddress, tokenDecimal } = info;
       const result = await this.etherscan.getTokenBalance(
         contractAddress,
-        conn.address,
+        address,
         blockNumber
       );
       const balance = this.getValue(result, tokenDecimal);
-      const account = `${conn.accountPrefix}:${symbol}`;
+      const account = `${accountPrefix}:${symbol}`;
       balances.push(`${date} balance ${account} ${balance} ${symbol}`);
     }
 
@@ -113,7 +111,7 @@ export class CryptoParser {
     txMap: EthTxMap,
     transfers: ERC20Transfer[],
     tokensMetadata: TokenMetadataMap
-  ) {
+  ): Promise<void> {
     for (let i = 0; i < transfers.length; i++) {
       const transfer = transfers[i];
       console.log(`  process ERC20 tx (${i + 1} / ${transfers.length})`);
@@ -146,46 +144,55 @@ export class CryptoParser {
     }
   }
 
-  getETHDirectives(
-    from: string,
-    to: string,
-    value: string,
-    defaultAccount: DefaultAccount
-  ): Directive[] {
-    const { connections } = this.config;
-    const fromConn = this.getConnection(from, connections);
-    const toConn = this.getConnection(to, connections);
+  getETHDirectives(from: string, to: string, value: string): Directive[] {
+    const { defaultAccount } = this.config;
+    const fromConn = this.getConnection(from);
+    const toConn = this.getConnection(to);
     const directives = [];
 
-    directives.push(
-      this.getDirective(
-        "-",
-        value,
-        "18",
-        fromConn,
-        "ETH",
-        defaultAccount.deposit
-      )
+    const fromAccount = this.getAccount(
+      fromConn?.accountPrefix,
+      "ETH",
+      defaultAccount.deposit
     );
 
+    const toAccount = this.getAccount(
+      toConn?.accountPrefix,
+      "ETH",
+      defaultAccount.withdraw
+    );
+
+    const toVal = this.getValue(value, "18");
+    const fromVal = "-" + toVal;
+
     directives.push(
-      this.getDirective("", value, "18", toConn, "ETH", defaultAccount.withdraw)
+      new Directive(fromAccount, fromVal, "ETH"),
+      new Directive(toAccount, toVal, "ETH")
     );
 
     return directives;
   }
 
-  getERC20Driectives(
-    transfers: ERC20Transfer[],
-    conns: Connection[],
-    defaultAccount: DefaultAccount
-  ) {
+  getERC20Driectives(transfers: ERC20Transfer[]) {
+    const { defaultAccount } = this.config;
     const dirs = [];
     transfers.forEach(transfer => {
       const { from, to, tokenSymbol, tokenDecimal, value } = transfer;
 
-      const fromConn = this.getConnection(from, conns);
-      const toConn = this.getConnection(to, conns);
+      const fromConn = this.getConnection(from);
+      const toConn = this.getConnection(to);
+
+      const fromAccount = this.getAccount(
+        fromConn?.accountPrefix,
+        tokenSymbol,
+        defaultAccount.deposit
+      );
+
+      const toAccount = this.getAccount(
+        toConn?.accountPrefix,
+        tokenSymbol,
+        defaultAccount.withdraw
+      );
 
       // filter default account if there are more than 1 transfer
       // merged from:
@@ -196,29 +203,12 @@ export class CryptoParser {
       // to:
       //   Assets:Crypto:Wallet:SAI -20 SAI
       //   Assets:Crypto:Wallet:CSAI 100 CSAI
+      const amount = this.getValue(value, tokenDecimal);
       if ((fromConn || transfers.length <= 1) && value !== "0") {
-        dirs.push(
-          this.getDirective(
-            "-",
-            value,
-            tokenDecimal,
-            fromConn,
-            tokenSymbol,
-            defaultAccount.deposit
-          )
-        );
+        dirs.push(new Directive(fromAccount, `-${amount}`, tokenSymbol));
       }
       if ((toConn || transfers.length <= 1) && value !== "0") {
-        dirs.push(
-          this.getDirective(
-            "",
-            value,
-            tokenDecimal,
-            toConn,
-            tokenSymbol,
-            defaultAccount.withdraw
-          )
-        );
+        dirs.push(new Directive(toAccount, amount, tokenSymbol));
       }
     });
 
@@ -354,7 +344,7 @@ export class CryptoParser {
     const { directives, metadata } = beanTx;
     metadata["tx"] = hash;
 
-    const fromConn = this.getConnection(from, connections);
+    const fromConn = this.getConnection(from);
 
     if (fromConn) {
       directives.push(
@@ -365,17 +355,13 @@ export class CryptoParser {
 
     // ERC20 transfer or exchange
     if (transfers) {
-      const dirs = this.getERC20Driectives(
-        transfers,
-        connections,
-        defaultAccount
-      );
+      const dirs = this.getERC20Driectives(transfers);
       directives.push(...dirs);
     }
 
     // EtH Transfer
     if (val !== "0") {
-      const dirs = this.getETHDirectives(from, to, value, defaultAccount);
+      const dirs = this.getETHDirectives(from, to, value);
       directives.push(...dirs);
     }
 

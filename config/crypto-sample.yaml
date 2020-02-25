@@ -8,8 +8,19 @@ connections:
     accountPrefix: Assets:Crypto:TestAccount
 rules:
   - type: ethereum
-    to: "0x6ab5bc70622763f270220127189f3e61237ae1f2"
-    account: Assets:Crypto:DaiSaving
+    pattern:
+      to: "0x6ab5bc70622763f270220127189f3e61237ae1f2"
+    transform:
+      - field: account
+        value: Assets:Crypto:DaiSaving
+  - type: ethereum
+    pattern:
+      symbol: ETH-SYM
+    transform:
+      - field: symbol
+        value: SYM
+timestamp:
+  ethereum: "0"
 coins:
   - symbol: BAT
     id: basic-attention-token
@@ -21,10 +32,4 @@ coins:
     id: tether
   - symbol: DAI
     id: dai
-  - symbol: CDAI
-    id: compound-dai
-  - symbol: CUSDC
-    id: compound-usd-coin
 fiat: TWD
-timestamp:
-  ethereum: 0
