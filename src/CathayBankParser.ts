@@ -4,7 +4,9 @@ import path, { basename } from "path";
 import * as iconv from "iconv-lite";
 import parse from "csv-parse/lib/sync";
 import moment from "moment";
-import { Config } from "../Config";
+import { Config } from "./Config";
+import CathayBankConfig from "./CathayBankConfig";
+import { plainToClass } from "class-transformer";
 
 enum TxType {
   Deposit = "deposit",
@@ -12,7 +14,7 @@ enum TxType {
 }
 
 export class CathayBankParser {
-  config: Config;
+  config: CathayBankConfig;
   basename: string;
 
   static command = "cathay-bank";
@@ -22,9 +24,9 @@ export class CathayBankParser {
   ];
 
   constructor(options: any) {
-    const config = Config.parse(options.config);
-    config["inputFile"] = options.inputFile;
-    config["outputDir"] = process.cwd();
+    const config = plainToClass(CathayBankConfig, Config.parse(options.config));
+    config.inputFile = options.inputFile;
+    config.outputDir = process.cwd();
 
     this.config = config;
     this.basename = basename(config.inputFile, ".csv");

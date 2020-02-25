@@ -1,18 +1,19 @@
 import { readFileSync } from "fs";
 import * as yaml from "js-yaml";
 
+export interface DefaultAccount {
+  deposit: string;
+  withdraw: string;
+  base?: string;
+  ethTx?: string;
+}
+
 export class Config {
-  [key: string]: any;
+  defaultAccount: DefaultAccount;
+  outputDir: string;
 
-  constructor(json: object) {
-    Object.entries(json).forEach(([key, value]) => {
-      this[key] = value;
-    });
-  }
-
-  static parse(file: string): Config {
+  static parse(file: string): any {
     const content = readFileSync(file, { encoding: "utf8" });
-    const config = yaml.safeLoad(content);
-    return new Config(config);
+    return yaml.safeLoad(content);
   }
 }

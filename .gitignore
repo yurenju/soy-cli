@@ -1,3 +1,7 @@
 build
 node_modules
 .vscode
+.env
+*.bean
+.nyc_output
+coverage

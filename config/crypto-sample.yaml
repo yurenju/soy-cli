@@ -1,0 +1,35 @@
+defaultAccount:
+  deposit: Income:Unknown
+  withdraw: Expenses:Unknown
+  ethTx: Expenses:Ethereum:TransactionFee
+connections:
+  - type: ethereum
+    address: "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6"
+    accountPrefix: Assets:Crypto:TestAccount
+rules:
+  - type: ethereum
+    pattern:
+      to: "0x6ab5bc70622763f270220127189f3e61237ae1f2"
+    transform:
+      - field: account
+        value: Assets:Crypto:DaiSaving
+  - type: ethereum
+    pattern:
+      symbol: ETH-SYM
+    transform:
+      - field: symbol
+        value: SYM
+timestamp:
+  ethereum: "0"
+coins:
+  - symbol: BAT
+    id: basic-attention-token
+  - symbol: ETH
+    id: ethereum
+  - symbol: USDC
+    id: usd-coin
+  - symbol: USDT
+    id: tether
+  - symbol: DAI
+    id: dai
+fiat: TWD

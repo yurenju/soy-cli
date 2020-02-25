@@ -2,7 +2,7 @@
   "compilerOptions": {
     "module": "commonjs",
     "sourceMap": true,
-    "target": "ESNext",
+    "target": "es2018",
     "outDir": "build",
     "esModuleInterop": true
   },

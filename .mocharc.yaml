@@ -1,0 +1,4 @@
+require:
+  - ts-node/register
+  - source-map-support
+spec: tests/**/*.test.ts

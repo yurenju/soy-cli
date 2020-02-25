@@ -1,6 +1,7 @@
+import "reflect-metadata";
 import { Command } from "commander";
-import { Config } from "./Config";
-import { CathayBankParser } from "./parsers/CathayBankParser";
+import { CathayBankParser } from "./CathayBankParser";
+import { CryptoParser } from "./CryptoParser";
 
 const program = new Command();
 
@@ -11,6 +12,16 @@ CathayBankParser.options.forEach(opt => {
 });
 cathayBankOption.action(options => {
   const parser = new CathayBankParser(options);
+  parser.parse();
+});
+
+// Cryptos
+let crpytoOptions = program.command(CryptoParser.command);
+CryptoParser.options.forEach(opt => {
+  crpytoOptions = crpytoOptions.option(opt);
+});
+crpytoOptions.action(options => {
+  const parser = new CryptoParser(options);
   parser.parse();
 });
 
