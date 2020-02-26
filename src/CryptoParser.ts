@@ -1,12 +1,10 @@
 import dotenv from "dotenv";
-import fetch from "node-fetch";
 import moment from "moment";
 import BigNumber from "bignumber.js";
 import { ShellString, mkdir } from "shelljs";
 import path from "path";
-import Bottleneck from "bottleneck";
 import { plainToClass } from "class-transformer";
-import { Config, DefaultAccount } from "./Config";
+import { Config } from "./Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
 import { CryptoConfig, Connection } from "./CryptoConfig";
@@ -14,11 +12,6 @@ import { EthTx, ERC20Transfer, Etherscan } from "./Etherscan";
 import { CoinGecko, HistoryPrice } from "./CoinGecko";
 
 dotenv.config();
-
-const cgcLmt = new Bottleneck({
-  maxConcurrent: 1,
-  minTime: 600
-});
 
 const decimals = new BigNumber(10).pow(18);
 
@@ -335,7 +328,7 @@ export class CryptoParser {
       gasPrice,
       hash
     } = tx;
-    const { connections, defaultAccount } = this.config;
+    const { defaultAccount } = this.config;
 
     const date = moment(parseInt(timeStamp) * 1000).format("YYYY-MM-DD");
 
@@ -353,6 +346,7 @@ export class CryptoParser {
 
     const fromConn = this.getConnection(from);
 
+    // Gas
     if (fromConn) {
       directives.push(
         new Directive(defaultAccount.ethTx, gas, "ETH"),
