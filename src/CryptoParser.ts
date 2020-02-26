@@ -11,10 +11,9 @@ import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
 import { CryptoConfig, Connection } from "./CryptoConfig";
 import { EthTx, ERC20Transfer, Etherscan } from "./Etherscan";
+import { CoinGecko, HistoryPrice } from "./CoinGecko";
 
 dotenv.config();
-
-const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 
 const cgcLmt = new Bottleneck({
   maxConcurrent: 1,
@@ -36,6 +35,14 @@ interface EthTxMap {
   [hash: string]: EthTx;
 }
 
+export interface DateCoinMap {
+  [date: string]: CoinMap;
+}
+
+export interface CoinMap {
+  [coinId: string]: Directive[];
+}
+
 interface Options {
   config: string;
 }
@@ -43,15 +50,21 @@ interface Options {
 export class CryptoParser {
   config: CryptoConfig;
   etherscan: Etherscan;
+  coingecko: CoinGecko;
 
   static command = "crypto";
   static options = ["-c, --config <config-file>"];
   static envs = ["ETHERSCAN_API_KEY"];
 
-  constructor(options: Options) {
+  constructor(
+    options: Options,
+    etherscan = new Etherscan(process.env.ETHERSCAN_API_KEY),
+    coingecko = new CoinGecko()
+  ) {
     this.config = plainToClass(CryptoConfig, Config.parse(options.config));
     this.config.outputDir = process.cwd();
-    this.etherscan = new Etherscan(process.env.ETHERSCAN_API_KEY);
+    this.etherscan = etherscan;
+    this.coingecko = coingecko;
   }
 
   getValue(value: string, tokenDecimal: string): string {
@@ -235,9 +248,8 @@ export class CryptoParser {
     });
   }
 
-  async fillPrices(beans: BeanTransaction[]) {
-    const { fiat } = this.config;
-    const map = {};
+  getDateCoinMap(beans: BeanTransaction[]): DateCoinMap {
+    const map: DateCoinMap = {};
 
     beans.forEach(bean => {
       if (!map[bean.date]) {
@@ -259,26 +271,21 @@ export class CryptoParser {
       });
     });
 
-    const tasks = [];
+    return map;
+  }
+
+  async fillPrices(beans: BeanTransaction[]) {
+    const { fiat } = this.config;
+    const map = this.getDateCoinMap(beans);
+    const tasks: Promise<HistoryPrice>[] = [];
+
     Object.entries(map).forEach(([date, coinsMap]) => {
       Object.keys(coinsMap).forEach(id => {
-        const [y, m, d] = date.split("-");
-        const coinDate = `${d}-${m}-${y}`;
-        const url = `${COINGECKO_BASE_URL}/coins/${id}/history?date=${coinDate}`;
-        const task = cgcLmt
-          .schedule(() => fetch(url).then(res => res.json()))
-          .then((json: any) => {
-            json.date = date;
-            if (json.error) {
-              json.id = id;
-            }
-            return json;
-          });
-        tasks.push(task);
+        tasks.push(this.coingecko.getHistoryPrice(date, id));
       });
     });
     const results = await Promise.all(tasks);
-    results.forEach(result => {
+    results.forEach((result: HistoryPrice) => {
       const { date, id, symbol, error } = result;
       if (error) {
         console.error(`cannot find ${id} at ${date}`);
@@ -311,7 +318,7 @@ export class CryptoParser {
     } else if (tx.transfers.length <= 1) {
       narration = "ERC20 Transfer";
     } else {
-      narration = "ERC20 Exechange";
+      narration = "ERC20 Exchange";
     }
 
     return narration;

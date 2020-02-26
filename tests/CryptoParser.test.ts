@@ -5,6 +5,38 @@ import { Etherscan, EthTx, ERC20Transfer } from "../src/Etherscan";
 import { Connection } from "../src/CryptoConfig";
 import moment = require("moment");
 import Directive from "../src/Directive";
+import BeanTransaction from "../src/BeanTransaction";
+
+function createEthTx(timeStamp = ""): EthTx {
+  return {
+    hash: "",
+    transfers: [],
+    value: "",
+    timeStamp,
+    blockNumber: "",
+    from: "",
+    to: "",
+    gasUsed: "",
+    gasPrice: ""
+  };
+}
+
+function createTransfer(
+  value = "0",
+  tokenDecimal = "3",
+  tokenSymbol = "SYM"
+): ERC20Transfer {
+  return {
+    from: "",
+    to: "",
+    tokenSymbol,
+    tokenDecimal,
+    value,
+    timeStamp: "0",
+    hash: "",
+    contractAddress: ""
+  };
+}
 
 describe("CryptoParser", () => {
   let parser: CryptoParser;
@@ -67,17 +99,7 @@ describe("CryptoParser", () => {
       when(
         mockedEtherscan.getTokenBalance(anyString(), anyString(), anyString())
       ).thenResolve("1234");
-      const tx: EthTx = {
-        hash: "",
-        transfers: [],
-        value: "",
-        timeStamp,
-        blockNumber: "",
-        from: "",
-        to: "",
-        gasUsed: "",
-        gasPrice: ""
-      };
+      const tx: EthTx = createEthTx(timeStamp);
       const conn: Connection = {
         type: "",
         accountPrefix: "prefix",
@@ -217,6 +239,46 @@ describe("CryptoParser", () => {
       parser.patternReplace(d);
       expect(d.symbol).to.eq("SYM");
       expect(d.account).to.eq("TestAccount:SYM");
+    });
+  });
+
+  describe("getDateCoinMap()", () => {
+    it("get map with id", () => {
+      const d = new Directive("TestAccount", "12.3", "BAT");
+      const tx = new BeanTransaction("2020-02-25", "*", "", "narration", [d]);
+      const map = parser.getDateCoinMap([tx]);
+      expect(Object.keys(map).length).to.eq(1);
+      expect(map["2020-02-25"]["basic-attention-token"][0]).to.eq(d);
+    });
+  });
+
+  describe("getNarration()", () => {
+    it("get Exchange narration if transfers great than 1", () => {
+      const tx = createEthTx();
+      tx.transfers.push(createTransfer(), createTransfer());
+      const narration = parser.getNarration(tx);
+      expect(narration).to.eq("ERC20 Exchange");
+    });
+
+    it("get ERC20 transfer narration if transfers is 1", () => {
+      const tx = createEthTx();
+      tx.transfers.push(createTransfer());
+      const narration = parser.getNarration(tx);
+      expect(narration).to.eq("ERC20 Transfer");
+    });
+
+    it("get ETH transfer if no transfer and value is not zero", () => {
+      const tx = createEthTx();
+      tx.value = "20";
+      const narration = parser.getNarration(tx);
+      expect(narration).to.eq("ETH Transfer");
+    });
+
+    it("get Contract Execution if value is not zero", () => {
+      const tx = createEthTx();
+      tx.value = "0";
+      const narration = parser.getNarration(tx);
+      expect(narration).to.eq("Contract Execution");
     });
   });
 });
