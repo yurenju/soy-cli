@@ -6,6 +6,7 @@ import { Connection } from "../src/CryptoConfig";
 import moment = require("moment");
 import Directive from "../src/Directive";
 import BeanTransaction from "../src/BeanTransaction";
+import BigNumber from "bignumber.js";
 
 function createEthTx(timeStamp = ""): EthTx {
   return {
@@ -279,6 +280,19 @@ describe("CryptoParser", () => {
       tx.value = "0";
       const narration = parser.getNarration(tx);
       expect(narration).to.eq("Contract Execution");
+    });
+  });
+
+  describe("toBeanTx()", () => {
+    it("has gas directive if from field if our address", () => {
+      const tx = createEthTx();
+      const decimals = new BigNumber(10).pow(18);
+      tx.from = "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6";
+      tx.gasUsed = "3";
+      tx.gasPrice = new BigNumber(4).multipliedBy(decimals).toString();
+
+      const bean = parser.toBeanTx(tx);
+      expect(bean.directives[0].amount).to.eq("12");
     });
   });
 });
