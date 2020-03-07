@@ -11,7 +11,7 @@ describe("BeanTransaction", () => {
         dir
       ]);
       expect(tx.toString()).to.eq(
-        `2019-03-03 * "description"\n  TestAccount 30.0 USD`
+        `2019-03-03 * "description"\n  TestAccount 30.0 USD {}`
       );
     });
   });

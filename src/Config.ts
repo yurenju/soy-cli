@@ -4,6 +4,7 @@ import * as yaml from "js-yaml";
 export interface DefaultAccount {
   deposit: string;
   withdraw: string;
+  pnl: string;
   base?: string;
   ethTx?: string;
 }

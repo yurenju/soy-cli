@@ -1,4 +1,6 @@
 import Bottleneck from "bottleneck";
+import fetch from "node-fetch";
+import moment = require("moment");
 
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 
@@ -30,16 +32,20 @@ export class CoinGecko {
   }
 
   getHistoryPrice(date: string, coinId: string): Promise<HistoryPrice> {
+    let actualCoinId = coinId;
+    if (coinId === "compound-sai" && moment(date).isBefore("2019-12-17")) {
+      actualCoinId = "cdai";
+    }
+
     const [y, m, d] = date.split("-");
     const coinDate = `${d}-${m}-${y}`;
-    const url = `${COINGECKO_BASE_URL}/coins/${coinId}/history?date=${coinDate}`;
+    const url = `${COINGECKO_BASE_URL}/coins/${actualCoinId}/history?date=${coinDate}`;
+    console.log(url, coinId);
     return this.limit
       .schedule(() => fetch(url).then(res => res.json()))
       .then((json: HistoryPrice) => {
         json.date = date;
-        if (json.error) {
-          json.id = coinId;
-        }
+        json.id = coinId;
         return json;
       });
   }

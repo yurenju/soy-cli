@@ -12,6 +12,7 @@ function createEthTx(timeStamp = ""): EthTx {
   return {
     hash: "",
     transfers: [],
+    internalTransfers: [],
     value: "",
     timeStamp,
     blockNumber: "",
@@ -67,15 +68,15 @@ describe("CryptoParser", () => {
     });
 
     it("matched", () => {
-      const expected = "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6";
+      const expected = "0x6344793a588c7b3076bf74562463998b2966ee91";
       const conn = parser.getConnection(expected);
-      expect(conn.address).to.eq(expected);
+      expect(conn.address.toLowerCase()).to.eq(expected);
     });
 
     it("matched with uppercase", () => {
-      const expected = "0x8B5E93256803C9D63A85D6B74E76EB8906919DD6";
+      const expected = "0x6344793A588C7B3076BF74562463998B2966EE91";
       const conn = parser.getConnection(expected);
-      expect(conn.address).to.eq(expected.toLowerCase());
+      expect(conn.address.toLowerCase()).to.eq(expected.toLowerCase());
     });
   });
 
@@ -121,7 +122,7 @@ describe("CryptoParser", () => {
   describe("getETHDirectives()", () => {
     it("transfer from our account to unknown expense", () => {
       const d = parser.getETHDirectives(
-        "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6",
+        "0x6344793a588c7b3076bf74562463998b2966ee91",
         "unknown-to-address",
         "1230000000000000000"
       );
@@ -137,7 +138,7 @@ describe("CryptoParser", () => {
     it("transfer from unknown income to our account", () => {
       const d = parser.getETHDirectives(
         "unknown-from-address",
-        "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6",
+        "0x6344793a588c7b3076bf74562463998b2966ee91",
         "1230000000000000000"
       );
       expect(d.length).to.eq(2);
@@ -154,7 +155,7 @@ describe("CryptoParser", () => {
     it("single transfer from our own address", () => {
       const transfers: ERC20Transfer[] = [
         {
-          from: "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6",
+          from: "0x6344793a588c7b3076bf74562463998b2966ee91",
           to: "unknown-to-address",
           tokenSymbol: "SYM",
           tokenDecimal: "2",
@@ -179,7 +180,7 @@ describe("CryptoParser", () => {
       const transfers: ERC20Transfer[] = [
         {
           from: "unknown-from-address",
-          to: "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6",
+          to: "0x6344793a588c7b3076bf74562463998b2966ee91",
           tokenSymbol: "SYM",
           tokenDecimal: "2",
           value: "123",
@@ -202,7 +203,7 @@ describe("CryptoParser", () => {
     it("merge transactions", () => {
       const transfers: ERC20Transfer[] = [
         {
-          from: "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6",
+          from: "0x6344793a588c7b3076bf74562463998b2966ee91",
           to: "somewhere",
           tokenSymbol: "SYM",
           tokenDecimal: "2",
@@ -213,7 +214,7 @@ describe("CryptoParser", () => {
         },
         {
           from: "somewhere",
-          to: "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6",
+          to: "0x6344793a588c7b3076bf74562463998b2966ee91",
           tokenSymbol: "CSYM",
           tokenDecimal: "4",
           value: "55660000",
@@ -287,7 +288,7 @@ describe("CryptoParser", () => {
     it("has gas directive if from field if our address", () => {
       const tx = createEthTx();
       const decimals = new BigNumber(10).pow(18);
-      tx.from = "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6";
+      tx.from = "0x6344793a588c7b3076bf74562463998b2966ee91";
       tx.gasUsed = "3";
       tx.gasPrice = new BigNumber(4).multipliedBy(decimals).toString();
 

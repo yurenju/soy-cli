@@ -89,6 +89,7 @@ export class CryptoParser {
     tokensMetadata: TokenMetadataMap,
     conn: Connection
   ): Promise<string[]> {
+    const { excludeCoins } = this.config;
     const { blockNumber, timeStamp } = lastTx;
     const { accountPrefix, address } = conn;
     const balances = [];
@@ -99,6 +100,9 @@ export class CryptoParser {
     const meta = Object.entries(tokensMetadata);
     for (let j = 0; j < meta.length; j++) {
       const [symbol, info] = meta[j];
+      if (excludeCoins.find(coin => coin === symbol)) {
+        continue;
+      }
       const { contractAddress, tokenDecimal } = info;
       const result = await this.etherscan.getTokenBalance(
         contractAddress,
@@ -116,6 +120,7 @@ export class CryptoParser {
   async normalizeTransfers(
     txMap: EthTxMap,
     transfers: ERC20Transfer[],
+    internalTransfers: EthTx[],
     tokensMetadata: TokenMetadataMap
   ): Promise<void> {
     for (let i = 0; i < transfers.length; i++) {
@@ -148,6 +153,11 @@ export class CryptoParser {
         tx.transfers.push(transfer);
       }
     }
+
+    internalTransfers.forEach(transfer => {
+      const tx = txMap[transfer.hash];
+      tx.internalTransfers.push(transfer);
+    });
   }
 
   getETHDirectives(from: string, to: string, value: string): Directive[] {
@@ -179,11 +189,48 @@ export class CryptoParser {
     return directives;
   }
 
+  getInternalDirectives(transfers: EthTx[]) {
+    const { defaultAccount, excludeCoins } = this.config;
+    const dirs = [];
+    transfers.forEach(transfer => {
+      const { from, to, value } = transfer;
+
+      const fromConn = this.getConnection(from);
+      const toConn = this.getConnection(to);
+
+      const fromAccount = this.getAccount(
+        fromConn?.accountPrefix,
+        "ETH",
+        defaultAccount.deposit
+      );
+
+      const toAccount = this.getAccount(
+        toConn?.accountPrefix,
+        "ETH",
+        defaultAccount.withdraw
+      );
+
+      const amount = this.getValue(value, "18");
+      if ((fromConn || transfers.length <= 1) && value !== "0") {
+        dirs.push(new Directive(fromAccount, `-${amount}`, "ETH"));
+      }
+      if ((toConn || transfers.length <= 1) && value !== "0") {
+        dirs.push(new Directive(toAccount, amount, "ETH"));
+      }
+    });
+
+    return dirs;
+  }
+
   getERC20Driectives(transfers: ERC20Transfer[]) {
-    const { defaultAccount } = this.config;
+    const { defaultAccount, excludeCoins } = this.config;
     const dirs = [];
     transfers.forEach(transfer => {
       const { from, to, tokenSymbol, tokenDecimal, value } = transfer;
+
+      if (excludeCoins.find(coin => coin === tokenSymbol)) {
+        return;
+      }
 
       const fromConn = this.getConnection(from);
       const toConn = this.getConnection(to);
@@ -268,7 +315,7 @@ export class CryptoParser {
   }
 
   async fillPrices(beans: BeanTransaction[]) {
-    const { fiat } = this.config;
+    const { fiat, defaultAccount } = this.config;
     const map = this.getDateCoinMap(beans);
     const tasks: Promise<HistoryPrice>[] = [];
 
@@ -291,7 +338,7 @@ export class CryptoParser {
           );
           return;
         }
-        if (dir.amount[0] !== "-" && dir.symbol === symbol.toUpperCase()) {
+        if (dir.amount[0] !== "-" || dir.account === defaultAccount.deposit) {
           dir.cost = `${
             result.market_data.current_price[fiat.toLowerCase()]
           } ${fiat}`;
@@ -321,6 +368,7 @@ export class CryptoParser {
     const {
       value,
       transfers,
+      internalTransfers,
       from,
       to,
       timeStamp,
@@ -355,10 +403,11 @@ export class CryptoParser {
     }
 
     // ERC20 transfer or exchange
-    if (transfers) {
-      const dirs = this.getERC20Driectives(transfers);
-      directives.push(...dirs);
-    }
+    const dirs = this.getERC20Driectives(transfers);
+    directives.push(...dirs);
+
+    // internal transfer
+    directives.push(...this.getInternalDirectives(internalTransfers));
 
     // EtH Transfer
     if (val !== "0") {
@@ -367,6 +416,9 @@ export class CryptoParser {
     }
 
     beanTx.directives.forEach(dir => this.patternReplace(dir));
+    const pnl = new Directive(defaultAccount.pnl);
+    pnl.ambiguousPrice = false;
+    beanTx.directives.push(pnl);
     return beanTx;
   }
 
@@ -384,18 +436,23 @@ export class CryptoParser {
         const address = conn.address.toLowerCase();
         const txlistRes: any = await this.etherscan.getTxList(address);
         const tokenRes: any = await this.etherscan.getErc20TxList(address);
+        const txInternalRes: any = await this.etherscan.getTxListInternal(
+          address
+        );
 
         // convert to map
         txlistRes.result.forEach(tx => {
           if (!ethTxnMap[tx.hash]) {
             ethTxnMap[tx.hash] = tx;
             tx.transfers = [];
+            tx.internalTransfers = [];
           }
         });
 
         await this.normalizeTransfers(
           ethTxnMap,
           tokenRes.result,
+          txInternalRes.result,
           tokensMetadata
         );
 

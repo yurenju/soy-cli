@@ -18,6 +18,7 @@ export interface ERC20Transfer {
 export interface EthTx {
   hash: string;
   transfers: ERC20Transfer[];
+  internalTransfers: EthTx[];
   value: string;
   timeStamp: string;
   blockNumber: string;
@@ -84,6 +85,15 @@ export class Etherscan {
     }).toString();
   }
 
+  private getTxListInternalParams(address: string) {
+    return new URLSearchParams({
+      module: "account",
+      action: "txlistinternal",
+      address,
+      apikey: this.apiKey
+    }).toString();
+  }
+
   private getTokenTxParams(address: string) {
     return new URLSearchParams({
       module: "account",
@@ -114,7 +124,8 @@ export class Etherscan {
       hash: txResult.hash,
       value: new BigNumber(txResult.value).toString(),
       timeStamp: "",
-      transfers: []
+      transfers: [],
+      internalTransfers: []
     };
   }
 
@@ -134,6 +145,11 @@ export class Etherscan {
 
   getTxList(address: string) {
     const url = `${this.baseUrl}?${this.getTxListParams(address)}`;
+    return this.limit.schedule(() => fetch(url).then(res => res.json()));
+  }
+
+  getTxListInternal(address: string) {
+    const url = `${this.baseUrl}?${this.getTxListInternalParams(address)}`;
     return this.limit.schedule(() => fetch(url).then(res => res.json()));
   }
 

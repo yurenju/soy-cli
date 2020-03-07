@@ -30,6 +30,7 @@ export interface Coin {
 export class CryptoConfig extends Config {
   connections: Connection[];
   rules: Rule[];
+  excludeCoins: string[];
   timestamp: { ethereum: string };
   coins: Coin[];
   fiat: string;

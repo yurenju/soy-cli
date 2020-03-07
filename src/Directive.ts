@@ -4,6 +4,7 @@ export default class Directive {
   cost: string;
   price: string;
   symbol: string;
+  ambiguousPrice: boolean;
   metadata: { [key: string]: string };
 
   constructor(
@@ -12,6 +13,7 @@ export default class Directive {
     symbol = "",
     cost = "",
     price = "",
+    ambiguousPrice = true,
     metadata = {}
   ) {
     this.account = account;
@@ -20,12 +22,13 @@ export default class Directive {
     this.cost = cost;
     this.price = price;
     this.metadata = metadata;
+    this.ambiguousPrice = ambiguousPrice;
   }
 
   toString() {
     const { account, amount, symbol, cost, price } = this;
     const strArr = [account, amount, symbol];
-    if (cost || amount[0] === "-") {
+    if (cost || this.ambiguousPrice) {
       strArr.push(`{${cost}}`);
     }
     if (price) {
@@ -37,9 +40,9 @@ export default class Directive {
       .join("\n");
 
     if (metadata !== "") {
-      return `  ${strArr.join(" ")}\n${metadata}`;
+      return `  ${strArr.join(" ")}\n${metadata}`.trimRight();
     } else {
-      return `  ${strArr.join(" ")}`;
+      return `  ${strArr.join(" ")}`.trimRight();
     }
   }
 }

@@ -2,9 +2,10 @@ defaultAccount:
   deposit: Income:Unknown
   withdraw: Expenses:Unknown
   ethTx: Expenses:Ethereum:TransactionFee
+  pnl: Income:Crypto:PnL
 connections:
   - type: ethereum
-    address: "0x8b5e93256803c9d63a85d6b74e76eb8906919dd6"
+    address: "0x6344793A588C7B3076bf74562463998b2966eE91"
     accountPrefix: Assets:Crypto:TestAccount
 rules:
   - type: ethereum
@@ -19,6 +20,8 @@ rules:
     transform:
       - field: symbol
         value: SYM
+excludeCoins:
+  - KICK
 timestamp:
   ethereum: "0"
 coins:
@@ -26,10 +29,12 @@ coins:
     id: basic-attention-token
   - symbol: ETH
     id: ethereum
-  - symbol: USDC
-    id: usd-coin
-  - symbol: USDT
-    id: tether
   - symbol: DAI
     id: dai
+  - symbol: CDAI
+    id: cdai
+  - symbol: SAI
+    id: sai
+  - symbol: CSAI
+    id: compound-sai
 fiat: TWD
