@@ -10,7 +10,7 @@ connections:
 rules:
   - type: ethereum
     pattern:
-      to: "0x6ab5bc70622763f270220127189f3e61237ae1f2"
+      address: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
     transform:
       - field: account
         value: Assets:Crypto:DaiSaving

@@ -262,10 +262,14 @@ export class CryptoParser {
       //   Assets:Crypto:Wallet:CSAI 100 CSAI
       const amount = this.getValue(value, tokenDecimal);
       if ((fromConn || transfers.length <= 1) && value !== "0") {
-        dirs.push(new Directive(fromAccount, `-${amount}`, tokenSymbol));
+        const dir = new Directive(fromAccount, `-${amount}`, tokenSymbol);
+        dir.metadata.address = from;
+        dirs.push(dir);
       }
       if ((toConn || transfers.length <= 1) && value !== "0") {
-        dirs.push(new Directive(toAccount, amount, tokenSymbol));
+        const dir = new Directive(toAccount, amount, tokenSymbol);
+        dir.metadata.address = to;
+        dirs.push(dir);
       }
     });
 
@@ -276,7 +280,7 @@ export class CryptoParser {
     const { rules } = this.config;
     rules.forEach(rule => {
       const matched = Object.entries(rule.pattern).some(
-        ([key, value]) => dir[key] === value
+        ([key, value]) => dir[key] === value || dir.metadata[key] === value
       );
 
       if (matched) {

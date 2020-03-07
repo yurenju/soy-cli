@@ -25,7 +25,7 @@ export default class Directive {
     this.ambiguousPrice = ambiguousPrice;
   }
 
-  toString() {
+  toString(showMetaData = false) {
     const { account, amount, symbol, cost, price } = this;
     const strArr = [account, amount, symbol];
     if (cost || this.ambiguousPrice) {
@@ -39,7 +39,7 @@ export default class Directive {
       .map(([key, value]) => `    ${key}: "${value}"`)
       .join("\n");
 
-    if (metadata !== "") {
+    if (metadata !== "" && showMetaData) {
       return `  ${strArr.join(" ")}\n${metadata}`.trimRight();
     } else {
       return `  ${strArr.join(" ")}`.trimRight();
