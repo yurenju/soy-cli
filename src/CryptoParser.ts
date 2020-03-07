@@ -58,6 +58,10 @@ export class CryptoParser {
     this.config.outputDir = process.cwd();
     this.etherscan = etherscan;
     this.coingecko = coingecko;
+
+    if (!this.config.excludeCoins) {
+      this.config.excludeCoins = [];
+    }
   }
 
   getValue(value: string, tokenDecimal: string): string {
@@ -190,7 +194,7 @@ export class CryptoParser {
   }
 
   getInternalDirectives(transfers: EthTx[]) {
-    const { defaultAccount, excludeCoins } = this.config;
+    const { defaultAccount } = this.config;
     const dirs = [];
     transfers.forEach(transfer => {
       const { from, to, value } = transfer;
