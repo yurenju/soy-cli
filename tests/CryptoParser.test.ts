@@ -1,8 +1,8 @@
 import { CryptoParser, TokenMetadataMap } from "../src/CryptoParser";
 import { expect } from "chai";
 import { mock, instance, when, anyString } from "ts-mockito";
-import { Etherscan, EthTx, ERC20Transfer } from "../src/Etherscan";
-import { Connection } from "../src/CryptoConfig";
+import { Etherscan, EthTx, ERC20Transfer } from "../src/services/Etherscan";
+import { Connection } from "../src/config/CryptoConfig";
 import moment = require("moment");
 import Directive from "../src/Directive";
 import BeanTransaction from "../src/BeanTransaction";

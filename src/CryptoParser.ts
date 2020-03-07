@@ -4,12 +4,12 @@ import BigNumber from "bignumber.js";
 import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import { plainToClass } from "class-transformer";
-import { Config } from "./Config";
+import { Config } from "./config/Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
-import { CryptoConfig, Connection } from "./CryptoConfig";
-import { EthTx, ERC20Transfer, Etherscan } from "./Etherscan";
-import { CoinGecko, HistoryPrice } from "./CoinGecko";
+import { CryptoConfig, Connection } from "./config/CryptoConfig";
+import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
+import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
 
 dotenv.config();
 
