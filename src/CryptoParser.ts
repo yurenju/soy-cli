@@ -226,7 +226,7 @@ export class CryptoParser {
     return dirs;
   }
 
-  getERC20Driectives(transfers: ERC20Transfer[]) {
+  getERC20Directives(transfers: ERC20Transfer[]) {
     const { defaultAccount, excludeCoins } = this.config;
     const dirs = [];
     transfers.forEach(transfer => {
@@ -411,7 +411,7 @@ export class CryptoParser {
     }
 
     // ERC20 transfer or exchange
-    const dirs = this.getERC20Driectives(transfers);
+    const dirs = this.getERC20Directives(transfers);
     directives.push(...dirs);
 
     // internal transfer
@@ -430,9 +430,9 @@ export class CryptoParser {
     return beanTx;
   }
 
-  async roasteBean(): Promise<string> {
+  async roastBean(): Promise<string> {
     const { connections } = this.config;
-    const beanTxns: BeanTransaction[] = [];
+    const beanTxs: BeanTransaction[] = [];
     const ethTxnMap: EthTxMap = {};
     const balances = [];
     for (let i = 0; i < connections.length; i++) {
@@ -442,14 +442,14 @@ export class CryptoParser {
 
       if (conn.type === "ethereum") {
         const address = conn.address.toLowerCase();
-        const txlistRes: any = await this.etherscan.getTxList(address);
+        const txListRes: any = await this.etherscan.getTxList(address);
         const tokenRes: any = await this.etherscan.getErc20TxList(address);
         const txInternalRes: any = await this.etherscan.getTxListInternal(
           address
         );
 
         // convert to map
-        txlistRes.result.forEach(tx => {
+        txListRes.result.forEach(tx => {
           if (!ethTxnMap[tx.hash]) {
             ethTxnMap[tx.hash] = tx;
             tx.transfers = [];
@@ -465,7 +465,7 @@ export class CryptoParser {
         );
 
         // get last balance
-        const lastTx = [tokenRes, txlistRes]
+        const lastTx = [tokenRes, txListRes]
           .map(res => res.result.slice().pop())
           .sort((a, b) => parseInt(a.blockNumber) - parseInt(b.blockNumber))
           .pop();
@@ -476,17 +476,15 @@ export class CryptoParser {
       }
     }
 
-    const txlist = [...Object.values(ethTxnMap)].sort(
+    const txList = [...Object.values(ethTxnMap)].sort(
       (a, b) => parseInt(a.timeStamp) - parseInt(b.timeStamp)
     );
 
-    beanTxns.push(...txlist.map(tx => this.toBeanTx(tx)));
+    beanTxs.push(...txList.map(tx => this.toBeanTx(tx)));
 
-    await this.fillPrices(beanTxns);
+    await this.fillPrices(beanTxs);
     return (
-      beanTxns.map(t => t.toString()).join("\n\n") +
-      "\n\n" +
-      balances.join("\n")
+      beanTxs.map(t => t.toString()).join("\n\n") + "\n\n" + balances.join("\n")
     );
   }
 
@@ -494,12 +492,12 @@ export class CryptoParser {
     const { outputDir } = this.config;
 
     mkdir("-p", outputDir);
-    const beansContent = await this.roasteBean();
+    const beansContent = await this.roastBean();
     this.writeBeanFile(beansContent, outputDir);
   }
 
   writeBeanFile(content: string, outputDir: string) {
-    const filepath = path.join(outputDir, `${CryptoParser.command}.bean`);
-    new ShellString(content).to(filepath);
+    const filePath = path.join(outputDir, `${CryptoParser.command}.bean`);
+    new ShellString(content).to(filePath);
   }
 }
