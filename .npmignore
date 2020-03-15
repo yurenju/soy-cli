@@ -3,3 +3,4 @@
 .coverage
 tests
 *.bean
+.vscode
