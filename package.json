@@ -1,8 +1,11 @@
 {
   "name": "accounting-utils",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "",
-  "main": "index.js",
+  "main": "./build/index.js",
+  "bin": {
+    "soy": "./build/index.js"
+  },
   "scripts": {
     "start": "ts-node src/index.ts",
     "build": "tsc",
