@@ -1,4 +1,4 @@
-import { Config } from "./config/Config";
+import { Config } from "./Config";
 
 interface Rule {
   pattern: string;

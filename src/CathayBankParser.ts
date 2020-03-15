@@ -5,7 +5,7 @@ import * as iconv from "iconv-lite";
 import parse from "csv-parse/lib/sync";
 import moment from "moment";
 import { Config } from "./config/Config";
-import CathayBankConfig from "./CathayBankConfig";
+import CathayBankConfig from "./config/CathayBankConfig";
 import { plainToClass } from "class-transformer";
 
 enum TxType {
