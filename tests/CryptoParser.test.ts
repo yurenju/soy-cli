@@ -296,4 +296,24 @@ describe("CryptoParser", () => {
       expect(bean.directives[0].amount).to.eq("12");
     });
   });
+
+  describe("directiveTransform", () => {
+    it("transform matched field to new value", () => {
+      const data = {
+        account: "test-account"
+      };
+      parser.directiveTransform(data, "account", "new-account");
+      expect(data.account).to.eq("new-account");
+    });
+
+    it("transform account for symbol", () => {
+      const data = {
+        account: "test-account:ETH-SYM",
+        symbol: "ETH-SYM"
+      };
+      parser.directiveTransform(data, "symbol", "SYM");
+      expect(data.account).to.eq("test-account:SYM");
+      expect(data.symbol).to.eq("SYM");
+    });
+  });
 });

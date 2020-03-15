@@ -88,6 +88,14 @@ export class CryptoParser {
     return prefix !== undefined ? `${prefix}:${symbol}` : defaultAccount;
   }
 
+  directiveTransform(data: Record<string, any>, field: string, value: any) {
+    if (field === "symbol") {
+      const regex = new RegExp(`${data.symbol}$`);
+      data.account = data.account.replace(regex, value);
+    }
+    data[field] = value;
+  }
+
   async getBalances(
     lastTx: EthTx,
     tokensMetadata: TokenMetadataMap,
@@ -120,13 +128,9 @@ export class CryptoParser {
       rules.forEach(rule =>
         rule.pattern.forEach(({ type, field, value }) => {
           if (type === PatternType.Balance && data[field] === value) {
-            rule.transform.forEach(({ field, value }) => {
-              if (field === "symbol") {
-                const regex = new RegExp(`${data.symbol}$`);
-                data.account = data.account.replace(regex, value);
-              }
-              data[field] = value;
-            });
+            rule.transform.forEach(({ field, value }) =>
+              this.directiveTransform(data, field, value)
+            );
           }
         })
       );
@@ -309,11 +313,7 @@ export class CryptoParser {
       if (matched) {
         transform.forEach(({ type, field, value }) => {
           if (type === PatternType.Directive) {
-            if (field === "symbol") {
-              const regex = new RegExp(`${dir.symbol}$`);
-              dir.account = dir.account.replace(regex, value);
-            }
-            dir[field] = value;
+            this.directiveTransform(dir, field, value);
           }
           if (type === PatternType.Transaction) {
             tx[field] = value;
