@@ -2,7 +2,7 @@ import Bottleneck from "bottleneck";
 import fetch from "node-fetch";
 import moment = require("moment");
 
-const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
+export const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 
 export interface HistoryPrice {
   id: string;
