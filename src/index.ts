@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import "reflect-metadata";
 import { Command } from "commander";
 import { CathayBankParser } from "./CathayBankParser";
@@ -26,3 +28,7 @@ crpytoOptions.action(options => {
 });
 
 program.parse(process.argv);
+
+if (!process.argv.slice(2).length) {
+  program.outputHelp();
+}
