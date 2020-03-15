@@ -21,7 +21,9 @@ describe("Directive", () => {
     it("with metadata", () => {
       const dir = new Directive("TestAccount", "30.0", "USD");
       dir.metadata = { tx: "1234" };
-      expect(dir.toString()).to.eq(`  TestAccount 30.0 USD {}\n    tx: "1234"`);
+      expect(dir.toString(true)).to.eq(
+        `  TestAccount 30.0 USD {}\n    tx: "1234"`
+      );
     });
   });
 });

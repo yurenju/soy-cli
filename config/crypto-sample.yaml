@@ -8,18 +8,33 @@ connections:
     address: "0x6344793A588C7B3076bf74562463998b2966eE91"
     accountPrefix: Assets:Crypto:TestAccount
 rules:
-  - type: ethereum
-    pattern:
-      address: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
+  - pattern:
+    - type: directive
+      field: symbol
+      value: ETH-SYM
     transform:
-      - field: account
+    - type: directive
+      field: symbol
+      value: SYM
+  - pattern:
+    - type: directive
+      field: address
+      value: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
+    transform:
+      - type: directive
+        field: account
         value: Assets:Crypto:DaiSaving
-  - type: ethereum
-    pattern:
-      symbol: ETH-SYM
+  - pattern:
+      - type: transaction
+        field: to
+        value: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
+      - type: directive
+        field: address
+        value: "0x0000000000000000000000000000000000000000"
     transform:
-      - field: symbol
-        value: SYM
+      - type: directive
+        field: account
+        value: Assets:Crypto:DaiSaving
 excludeCoins:
   - KICK
 timestamp:

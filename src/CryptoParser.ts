@@ -7,7 +7,7 @@ import { plainToClass } from "class-transformer";
 import { Config } from "./config/Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
-import { CryptoConfig, Connection } from "./config/CryptoConfig";
+import { CryptoConfig, Connection, PatternType } from "./config/CryptoConfig";
 import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
 import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
 
@@ -93,7 +93,7 @@ export class CryptoParser {
     tokensMetadata: TokenMetadataMap,
     conn: Connection
   ): Promise<string[]> {
-    const { excludeCoins } = this.config;
+    const { excludeCoins, rules } = this.config;
     const { blockNumber, timeStamp } = lastTx;
     const { accountPrefix, address } = conn;
     const balances = [];
@@ -115,7 +115,25 @@ export class CryptoParser {
       );
       const balance = this.getValue(result, tokenDecimal);
       const account = `${accountPrefix}:${symbol}`;
-      balances.push(`${date} balance ${account} ${balance} ${symbol}`);
+      const data = { date, account, balance, symbol };
+
+      rules.forEach(rule =>
+        rule.pattern.forEach(({ type, field, value }) => {
+          if (type === PatternType.Balance && data[field] === value) {
+            rule.transform.forEach(({ field, value }) => {
+              if (field === "symbol") {
+                const regex = new RegExp(`${data.symbol}$`);
+                data.account = data.account.replace(regex, value);
+              }
+              data[field] = value;
+            });
+          }
+        })
+      );
+
+      balances.push(
+        `${data.date} balance ${data.account} ${data.balance} ${data.symbol}`
+      );
     }
 
     return balances;
@@ -276,21 +294,30 @@ export class CryptoParser {
     return dirs;
   }
 
-  patternReplace(dir: Directive) {
+  patternReplace(dir: Directive, tx: BeanTransaction) {
     const { rules } = this.config;
-    rules.forEach(rule => {
-      const matched = Object.entries(rule.pattern).some(
-        ([key, value]) => dir[key] === value || dir.metadata[key] === value
-      );
+    rules.forEach(({ pattern, transform }) => {
+      const matched = pattern.every(({ type, field, value }) => {
+        if (type === PatternType.Directive) {
+          return dir[field] === value || dir.metadata[field] === value;
+        }
+        if (type === PatternType.Transaction) {
+          return tx.metadata[field] === value;
+        }
+      });
 
       if (matched) {
-        rule.transform.forEach(({ field, value }) => {
-          if (field === "symbol") {
-            const regex = new RegExp(`${dir.symbol}$`);
-            dir.account = dir.account.replace(regex, value);
+        transform.forEach(({ type, field, value }) => {
+          if (type === PatternType.Directive) {
+            if (field === "symbol") {
+              const regex = new RegExp(`${dir.symbol}$`);
+              dir.account = dir.account.replace(regex, value);
+            }
+            dir[field] = value;
           }
-
-          dir[field] = value;
+          if (type === PatternType.Transaction) {
+            tx[field] = value;
+          }
         });
       }
     });
@@ -323,7 +350,7 @@ export class CryptoParser {
   }
 
   async fillPrices(beans: BeanTransaction[]) {
-    const { fiat, defaultAccount } = this.config;
+    const { fiat } = this.config;
     const map = this.getDateCoinMap(beans);
     const tasks: Promise<HistoryPrice>[] = [];
 
@@ -334,7 +361,7 @@ export class CryptoParser {
     });
     const results = await Promise.all(tasks);
     results.forEach((result: HistoryPrice) => {
-      const { date, id, symbol, error } = result;
+      const { date, id, error } = result;
       if (error) {
         console.error(`cannot find ${id} at ${date}`);
         return;
@@ -346,7 +373,7 @@ export class CryptoParser {
           );
           return;
         }
-        if (dir.amount[0] !== "-" || dir.account === defaultAccount.deposit) {
+        if (dir.amount[0] !== "-" || dir.account.match(/^Income:/)) {
           dir.cost = `${
             result.market_data.current_price[fiat.toLowerCase()]
           } ${fiat}`;
@@ -398,7 +425,9 @@ export class CryptoParser {
     const narration = this.getNarration(tx);
     const beanTx = new BeanTransaction(date, "*", "", narration);
     const { directives, metadata } = beanTx;
-    metadata["tx"] = hash;
+    metadata.tx = hash;
+    metadata.from = from;
+    metadata.to = to;
 
     const fromConn = this.getConnection(from);
 
@@ -423,7 +452,7 @@ export class CryptoParser {
       directives.push(...dirs);
     }
 
-    beanTx.directives.forEach(dir => this.patternReplace(dir));
+    beanTx.directives.forEach(dir => this.patternReplace(dir, beanTx));
     const pnl = new Directive(defaultAccount.pnl);
     pnl.ambiguousPrice = false;
     beanTx.directives.push(pnl);

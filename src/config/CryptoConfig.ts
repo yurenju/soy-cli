@@ -6,19 +6,26 @@ export interface Connection {
   accountPrefix: string;
 }
 
+export enum PatternType {
+  Directive = "directive",
+  Transaction = "transaction",
+  Balance = "balance"
+}
+
 export interface Pattern {
-  symbol?: string;
-  to?: string;
+  type: PatternType;
+  field: string;
+  value: string;
 }
 
 export interface Transform {
+  type: PatternType;
   field: string;
   value: string;
 }
 
 export interface Rule {
-  type: string;
-  pattern: Pattern;
+  pattern: Pattern[];
   transform: Transform[];
 }
 

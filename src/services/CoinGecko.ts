@@ -40,9 +40,11 @@ export class CoinGecko {
     const [y, m, d] = date.split("-");
     const coinDate = `${d}-${m}-${y}`;
     const url = `${COINGECKO_BASE_URL}/coins/${actualCoinId}/history?date=${coinDate}`;
-    console.log(url, coinId);
     return this.limit
-      .schedule(() => fetch(url).then(res => res.json()))
+      .schedule(() => {
+        console.log(`fetching ${coinId} price at ${date} via coingecko`);
+        return fetch(url).then(res => res.json());
+      })
       .then((json: HistoryPrice) => {
         json.date = date;
         json.id = coinId;

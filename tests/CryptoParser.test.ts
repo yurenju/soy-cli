@@ -151,7 +151,7 @@ describe("CryptoParser", () => {
     });
   });
 
-  describe("getERC20Driectives()", () => {
+  describe("getERC20Directives()", () => {
     it("single transfer from our own address", () => {
       const transfers: ERC20Transfer[] = [
         {
@@ -166,7 +166,7 @@ describe("CryptoParser", () => {
         }
       ];
 
-      const d = parser.getERC20Driectives(transfers);
+      const d = parser.getERC20Directives(transfers);
       expect(d.length).to.eq(2);
       expect(d[0].account).to.eq("Assets:Crypto:TestAccount:SYM");
       expect(d[0].amount).to.eq("-1.23");
@@ -190,7 +190,7 @@ describe("CryptoParser", () => {
         }
       ];
 
-      const d = parser.getERC20Driectives(transfers);
+      const d = parser.getERC20Directives(transfers);
       expect(d.length).to.eq(2);
       expect(d[0].account).to.eq("Income:Unknown");
       expect(d[0].amount).to.eq("-1.23");
@@ -224,7 +224,7 @@ describe("CryptoParser", () => {
         }
       ];
 
-      const d = parser.getERC20Driectives(transfers);
+      const d = parser.getERC20Directives(transfers);
       expect(d.length).to.eq(2);
       expect(d[0].account).to.eq("Assets:Crypto:TestAccount:SYM");
       expect(d[0].amount).to.eq("-1.23");
@@ -238,7 +238,7 @@ describe("CryptoParser", () => {
   describe("patternReplace()", () => {
     it("replace symbol", () => {
       const d = new Directive("TestAccount:ETH-SYM", "1.23", "ETH-SYM");
-      parser.patternReplace(d);
+      parser.patternReplace(d, new BeanTransaction());
       expect(d.symbol).to.eq("SYM");
       expect(d.account).to.eq("TestAccount:SYM");
     });
