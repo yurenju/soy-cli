@@ -2,6 +2,11 @@ import { readFileSync } from "fs";
 import * as iconv from "iconv-lite";
 import parse from "csv-parse/lib/sync";
 
+export enum TxType {
+  Deposit = "deposit",
+  Withdraw = "withdraw"
+}
+
 export function parseCathayBankCsv(
   filename: string,
   encoding: string = "big5"

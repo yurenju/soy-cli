@@ -9,11 +9,7 @@ import CathayBankConfig from "./config/CathayBankConfig";
 import { plainToClass } from "class-transformer";
 import BeanTransaction from "./BeanTransaction";
 import Directive from "./Directive";
-
-enum TxType {
-  Deposit = "deposit",
-  Withdraw = "withdraw"
-}
+import { TxType } from "./Common";
 
 export class CathayBankParser {
   config: CathayBankConfig;
