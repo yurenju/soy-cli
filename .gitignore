@@ -4,3 +4,4 @@ node_modules
 *.bean
 .nyc_output
 coverage
+*.csv
