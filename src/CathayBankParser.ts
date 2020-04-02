@@ -7,6 +7,8 @@ import moment from "moment";
 import { Config } from "./config/Config";
 import CathayBankConfig from "./config/CathayBankConfig";
 import { plainToClass } from "class-transformer";
+import BeanTransaction from "./BeanTransaction";
+import Directive from "./Directive";
 
 enum TxType {
   Deposit = "deposit",
@@ -82,6 +84,7 @@ export class CathayBankParser {
   }
 
   roastBeans(csvRecords: any): string {
+    const txs: BeanTransaction[] = [];
     const { defaultParsingFields, defaultAccount } = this.config;
     const { base: baseAccount } = defaultAccount;
     const rules = {
@@ -93,7 +96,6 @@ export class CathayBankParser {
       rules[rule.type].push(rule);
     });
 
-    const lines = [];
     let last;
     csvRecords.forEach(record => {
       last = record;
@@ -102,7 +104,12 @@ export class CathayBankParser {
         .map(key => record[key].trim())
         .join(" ")
         .trim();
-      lines.push(`${date.format("YYYY-MM-DD")} * "${narration}"`);
+      const tx = new BeanTransaction(
+        date.format("YYYY-MM-DD"),
+        "*",
+        "",
+        narration
+      );
 
       const txType = this.getTxType(record);
       const matched = rules[txType].some(rule => {
@@ -112,14 +119,14 @@ export class CathayBankParser {
           const matched = record[field].match(new RegExp(pattern));
           if (matched) {
             if (txType === TxType.Deposit) {
-              lines.push(
-                `  ${baseAccount} ${record["存入"]} TWD`,
-                `  ${account}\n`
+              tx.directives.push(
+                new Directive(baseAccount, record["存入"], "TWD"),
+                new Directive(account)
               );
             } else {
-              lines.push(
-                `  ${account} ${record["提出"]} TWD`,
-                `  ${baseAccount}\n`
+              tx.directives.push(
+                new Directive(account, record["提出"], "TWD"),
+                new Directive(baseAccount)
               );
             }
           }
@@ -129,25 +136,27 @@ export class CathayBankParser {
 
       if (!matched) {
         if (txType === TxType.Deposit) {
-          lines.push(
-            `  ${baseAccount} ${record["存入"]} TWD`,
-            `  ${defaultAccount.deposit}\n`
+          tx.directives.push(
+            new Directive(baseAccount, record["存入"], "TWD"),
+            new Directive(defaultAccount.deposit)
           );
         } else {
-          lines.push(
-            `  ${defaultAccount.withdraw} ${record["提出"]} TWD`,
-            `  ${baseAccount}\n`
+          tx.directives.push(
+            new Directive(defaultAccount.withdraw, record["提出"], "TWD"),
+            new Directive(baseAccount)
           );
         }
       }
+      tx.directives.forEach(d => (d.ambiguousPrice = false));
+      txs.push(tx);
     });
 
-    const balance = last["餘額"];
+    const balanceAmount = last["餘額"];
     const date = moment(last["日期"], "YYYYMMDD")
       .add(1, "day")
       .format("YYYY-MM-DD");
-    lines.push(`${date} balance ${baseAccount} ${balance} TWD\n`);
+    const balance = `${date} balance ${baseAccount} ${balanceAmount} TWD\n`;
 
-    return lines.join("\n");
+    return txs.map(t => t.toString()).join("\n\n") + "\n\n" + balance;
   }
 }
