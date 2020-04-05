@@ -28,7 +28,7 @@ export default class Directive {
   toString(showMetaData = false) {
     const { account, amount, symbol, cost, price } = this;
     const strArr = [account, amount, symbol];
-    if (cost || this.ambiguousPrice) {
+    if (cost || !this.ambiguousPrice) {
       strArr.push(`{${cost}}`);
     }
     if (price) {

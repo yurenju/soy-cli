@@ -5,7 +5,7 @@ describe("Directive", () => {
   describe("toString()", () => {
     it("with account & amount", () => {
       const dir = new Directive("TestAccount", "30.0", "USD").toString();
-      expect(dir).to.eq("  TestAccount 30.0 USD {}");
+      expect(dir).to.eq("  TestAccount 30.0 USD");
     });
 
     it("with account, amount & cost", () => {
@@ -22,7 +22,7 @@ describe("Directive", () => {
       const dir = new Directive("TestAccount", "30.0", "USD");
       dir.metadata = { tx: "1234" };
       expect(dir.toString(true)).to.eq(
-        `  TestAccount 30.0 USD {}\n    tx: "1234"`
+        `  TestAccount 30.0 USD\n    tx: "1234"`
       );
     });
   });

@@ -3,6 +3,8 @@
 import "reflect-metadata";
 import { Command } from "commander";
 import { CathayBankParser } from "./CathayBankParser";
+import { CathayCreditCardParser } from "./CathayCreditCardParser";
+
 import { CryptoParser } from "./CryptoParser";
 
 const program = new Command();
@@ -14,6 +16,16 @@ CathayBankParser.options.forEach(opt => {
 });
 cathayBankOption.action(options => {
   const parser = new CathayBankParser(options);
+  parser.parse();
+});
+
+// Cathay Credit Card
+let cathayCreditCardOption = program.command(CathayCreditCardParser.command);
+CathayCreditCardParser.options.forEach(opt => {
+  cathayCreditCardOption = cathayCreditCardOption.option(opt);
+});
+cathayCreditCardOption.action(options => {
+  const parser = new CathayCreditCardParser(options);
   parser.parse();
 });
 

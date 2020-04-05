@@ -9,7 +9,7 @@ import CathayBankConfig from "./config/CathayBankConfig";
 import { plainToClass } from "class-transformer";
 import BeanTransaction from "./BeanTransaction";
 import Directive from "./Directive";
-import { TxType } from "./Common";
+import { TxType, patternReplace } from "./Common";
 
 export class CathayBankParser {
   config: CathayBankConfig;
@@ -81,71 +81,51 @@ export class CathayBankParser {
 
   roastBeans(csvRecords: any): string {
     const txs: BeanTransaction[] = [];
-    const { defaultParsingFields, defaultAccount } = this.config;
+    const { defaultAccount } = this.config;
     const { base: baseAccount } = defaultAccount;
-    const rules = {
-      deposit: [],
-      withdraw: []
-    };
-
-    this.config.rules.forEach(rule => {
-      rules[rule.type].push(rule);
-    });
 
     let last;
     csvRecords.forEach(record => {
       last = record;
       const date = moment(record["日期"], "YYYYMMDD");
-      const narration = ["說明", "備註", "特別備註"]
-        .map(key => record[key].trim())
-        .join(" ")
-        .trim();
+      const fields = {
+        說明: "description",
+        備註: "note",
+        特別備註: "extraNote"
+      };
+      const narration = record["說明"].trim();
       const tx = new BeanTransaction(
         date.format("YYYY-MM-DD"),
         "*",
         "",
         narration
       );
-
-      const txType = this.getTxType(record);
-      const matched = rules[txType].some(rule => {
-        const { pattern, account, fields = defaultParsingFields } = rule;
-
-        return fields.some(field => {
-          const matched = record[field].match(new RegExp(pattern));
-          if (matched) {
-            if (txType === TxType.Deposit) {
-              tx.directives.push(
-                new Directive(baseAccount, record["存入"], "TWD"),
-                new Directive(account)
-              );
-            } else {
-              tx.directives.push(
-                new Directive(account, record["提出"], "TWD"),
-                new Directive(baseAccount)
-              );
-            }
-          }
-          return matched;
-        });
+      tx.metadata = {};
+      Object.entries(fields).forEach(([key, value]) => {
+        if (record[key]) {
+          tx.metadata[value] = record[key].replace(/\s+/g, " ");
+        }
       });
 
-      if (!matched) {
-        if (txType === TxType.Deposit) {
-          tx.directives.push(
-            new Directive(baseAccount, record["存入"], "TWD"),
-            new Directive(defaultAccount.deposit)
-          );
-        } else {
-          tx.directives.push(
-            new Directive(defaultAccount.withdraw, record["提出"], "TWD"),
-            new Directive(baseAccount)
-          );
-        }
+      const txType = this.getTxType(record);
+
+      if (txType === TxType.Deposit) {
+        tx.directives.push(
+          new Directive(baseAccount, record["存入"], "TWD"),
+          new Directive(defaultAccount.income)
+        );
+      } else {
+        tx.directives.push(
+          new Directive(defaultAccount.expenses, record["提出"], "TWD"),
+          new Directive(baseAccount)
+        );
       }
-      tx.directives.forEach(d => (d.ambiguousPrice = false));
       txs.push(tx);
     });
+
+    txs.forEach(tx =>
+      tx.directives.forEach(dir => patternReplace(dir, tx, this.config.rules))
+    );
 
     const balanceAmount = last["餘額"];
     const date = moment(last["日期"], "YYYYMMDD")

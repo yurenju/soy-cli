@@ -2,11 +2,14 @@ import { CryptoParser, TokenMetadataMap } from "../src/CryptoParser";
 import { expect } from "chai";
 import { mock, instance, when, anyString } from "ts-mockito";
 import { Etherscan, EthTx, ERC20Transfer } from "../src/services/Etherscan";
-import { Connection } from "../src/config/CryptoConfig";
+import { Connection, CryptoConfig } from "../src/config/CryptoConfig";
 import moment = require("moment");
 import Directive from "../src/Directive";
 import BeanTransaction from "../src/BeanTransaction";
 import BigNumber from "bignumber.js";
+import { patternReplace, directiveTransform } from "../src/Common";
+import { PatternType, Rule, Config } from "../src/config/Config";
+import { plainToClass } from "class-transformer";
 
 function createEthTx(timeStamp = ""): EthTx {
   return {
@@ -42,10 +45,12 @@ function createTransfer(
 
 describe("CryptoParser", () => {
   let parser: CryptoParser;
+  let config: CryptoConfig;
 
   beforeEach(() => {
     const options = { config: `${__dirname}/../config/crypto-sample.yaml` };
     parser = new CryptoParser(options);
+    config = plainToClass(CryptoConfig, Config.parse(options.config));
   });
 
   it("constructor", () => {
@@ -238,7 +243,7 @@ describe("CryptoParser", () => {
   describe("patternReplace()", () => {
     it("replace symbol", () => {
       const d = new Directive("TestAccount:ETH-SYM", "1.23", "ETH-SYM");
-      parser.patternReplace(d, new BeanTransaction());
+      patternReplace(d, new BeanTransaction(), config.rules);
       expect(d.symbol).to.eq("SYM");
       expect(d.account).to.eq("TestAccount:SYM");
     });
@@ -302,7 +307,7 @@ describe("CryptoParser", () => {
       const data = {
         account: "test-account"
       };
-      parser.directiveTransform(data, "account", "new-account");
+      directiveTransform(data, "account", "new-account");
       expect(data.account).to.eq("new-account");
     });
 
@@ -311,7 +316,7 @@ describe("CryptoParser", () => {
         account: "test-account:ETH-SYM",
         symbol: "ETH-SYM"
       };
-      parser.directiveTransform(data, "symbol", "SYM");
+      directiveTransform(data, "symbol", "SYM");
       expect(data.account).to.eq("test-account:SYM");
       expect(data.symbol).to.eq("SYM");
     });

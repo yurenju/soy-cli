@@ -4,12 +4,13 @@ import BigNumber from "bignumber.js";
 import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import { plainToClass } from "class-transformer";
-import { Config } from "./config/Config";
+import { Config, PatternType } from "./config/Config";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
-import { CryptoConfig, Connection, PatternType } from "./config/CryptoConfig";
+import { CryptoConfig, Connection } from "./config/CryptoConfig";
 import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
 import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
+import { directiveTransform, patternReplace } from "./Common";
 
 dotenv.config();
 
@@ -88,14 +89,6 @@ export class CryptoParser {
     return prefix !== undefined ? `${prefix}:${symbol}` : defaultAccount;
   }
 
-  directiveTransform(data: Record<string, any>, field: string, value: any) {
-    if (field === "symbol") {
-      const regex = new RegExp(`${data.symbol}$`);
-      data.account = data.account.replace(regex, value);
-    }
-    data[field] = value;
-  }
-
   async getBalances(
     lastTx: EthTx,
     tokensMetadata: TokenMetadataMap,
@@ -129,7 +122,7 @@ export class CryptoParser {
         rule.pattern.forEach(({ type, field, value }) => {
           if (type === PatternType.Balance && data[field] === value) {
             rule.transform.forEach(({ field, value }) =>
-              this.directiveTransform(data, field, value)
+              directiveTransform(data, field, value)
             );
           }
         })
@@ -195,13 +188,13 @@ export class CryptoParser {
     const fromAccount = this.getAccount(
       fromConn?.accountPrefix,
       "ETH",
-      defaultAccount.deposit
+      defaultAccount.income
     );
 
     const toAccount = this.getAccount(
       toConn?.accountPrefix,
       "ETH",
-      defaultAccount.withdraw
+      defaultAccount.expenses
     );
 
     const toVal = this.getValue(value, "18");
@@ -227,13 +220,13 @@ export class CryptoParser {
       const fromAccount = this.getAccount(
         fromConn?.accountPrefix,
         "ETH",
-        defaultAccount.deposit
+        defaultAccount.income
       );
 
       const toAccount = this.getAccount(
         toConn?.accountPrefix,
         "ETH",
-        defaultAccount.withdraw
+        defaultAccount.expenses
       );
 
       const amount = this.getValue(value, "18");
@@ -264,13 +257,13 @@ export class CryptoParser {
       const fromAccount = this.getAccount(
         fromConn?.accountPrefix,
         tokenSymbol,
-        defaultAccount.deposit
+        defaultAccount.income
       );
 
       const toAccount = this.getAccount(
         toConn?.accountPrefix,
         tokenSymbol,
-        defaultAccount.withdraw
+        defaultAccount.expenses
       );
 
       // filter default account if there are more than 1 transfer
@@ -285,6 +278,7 @@ export class CryptoParser {
       const amount = this.getValue(value, tokenDecimal);
       if ((fromConn || transfers.length <= 1) && value !== "0") {
         const dir = new Directive(fromAccount, `-${amount}`, tokenSymbol);
+        dir.ambiguousPrice = false;
         dir.metadata.address = from;
         dirs.push(dir);
       }
@@ -296,31 +290,6 @@ export class CryptoParser {
     });
 
     return dirs;
-  }
-
-  patternReplace(dir: Directive, tx: BeanTransaction) {
-    const { rules } = this.config;
-    rules.forEach(({ pattern, transform }) => {
-      const matched = pattern.every(({ type, field, value }) => {
-        if (type === PatternType.Directive) {
-          return dir[field] === value || dir.metadata[field] === value;
-        }
-        if (type === PatternType.Transaction) {
-          return tx.metadata[field] === value;
-        }
-      });
-
-      if (matched) {
-        transform.forEach(({ type, field, value }) => {
-          if (type === PatternType.Directive) {
-            this.directiveTransform(dir, field, value);
-          }
-          if (type === PatternType.Transaction) {
-            tx[field] = value;
-          }
-        });
-      }
-    });
   }
 
   getDateCoinMap(beans: BeanTransaction[]): DateCoinMap {
@@ -411,7 +380,7 @@ export class CryptoParser {
       gasPrice,
       hash
     } = tx;
-    const { defaultAccount } = this.config;
+    const { defaultAccount, rules } = this.config;
 
     const date = moment(parseInt(timeStamp) * 1000).format("YYYY-MM-DD");
 
@@ -433,10 +402,14 @@ export class CryptoParser {
 
     // Gas
     if (fromConn) {
-      directives.push(
-        new Directive(defaultAccount.ethTx, gas, "ETH"),
-        new Directive(`${fromConn.accountPrefix}:ETH`, `-${gas}`, "ETH")
+      const gasExpense = new Directive(defaultAccount.ethTx, gas, "ETH");
+      const ethAccount = new Directive(
+        `${fromConn.accountPrefix}:ETH`,
+        `-${gas}`,
+        "ETH"
       );
+      ethAccount.ambiguousPrice = false;
+      directives.push(gasExpense, ethAccount);
     }
 
     // ERC20 transfer or exchange
@@ -452,9 +425,8 @@ export class CryptoParser {
       directives.push(...dirs);
     }
 
-    beanTx.directives.forEach(dir => this.patternReplace(dir, beanTx));
+    beanTx.directives.forEach(dir => patternReplace(dir, beanTx, rules));
     const pnl = new Directive(defaultAccount.pnl);
-    pnl.ambiguousPrice = false;
     beanTx.directives.push(pnl);
     return beanTx;
   }

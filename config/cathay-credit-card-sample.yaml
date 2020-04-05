@@ -1,0 +1,22 @@
+defaultAccount:
+  expenses: Expenses:Unknown
+  income: Income:Unknown
+  base: Liabilities:CreditCard:Cathay
+encoding: big5
+einvoiceIntegration: false
+rules:
+  - pattern:
+      - type: transaction
+        field: narration
+        value: ＫＯＫＯ一般回饋
+      - type: directive
+        field: account
+        value: Expenses:Unknown
+    transform:
+      - type: directive
+        field: account
+        value: Income:CreditCard:Reward
+
+
+
+

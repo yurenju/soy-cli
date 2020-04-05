@@ -1,18 +1,39 @@
 defaultAccount:
-  deposit: Income:Unknown
-  withdraw: Expenses:Unknown
+  income: Income:Unknown
+  expenses: Expenses:Unknown
   base: Assets:Bank:Cathay
 encoding: big5
-defaultParsingFields: [說明]
 rules:
-  - pattern: (統一發票中獎)
-    fields: [備註]
-    type: deposit
-    account: Liabilities:CreditCard:Cathay
-  - pattern: (信用卡款)
-    type: withdraw
-    account: Liabilities:CreditCard:Cathay
-  - pattern: (花旗)
-    fields: [備註]
-    type: withdraw
-    account: Liabilities:CreditCard:Cathay
+  - pattern:
+      - type: transaction
+        field: note
+        value: 統一發票中獎
+      - type: directive
+        field: account
+        value: Income:Unknown
+    transform:
+      - type: directive
+        field: account
+        value: Income:InvoiceLottery
+  - pattern:
+      - type: transaction
+        field: description
+        vale: 信用卡款
+      - type: directive
+        field: account
+        value: Expenses:Unknown
+    transform:
+      - type: directive
+        field: account
+        value: Liabilities:CreditCard:Cathay
+  - pattern:
+      - type: transaction
+        field: description
+        vale: 花旗
+      - type: directive
+        field: account
+        value: Expenses:Unknown
+    transform:
+      - type: directive
+        field: account
+        value: Liabilities:CreditCard:Citi

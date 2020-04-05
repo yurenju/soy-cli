@@ -1,6 +1,6 @@
 defaultAccount:
-  deposit: Income:Unknown
-  withdraw: Expenses:Unknown
+  income: Income:Unknown
+  expenses: Expenses:Unknown
   ethTx: Expenses:Ethereum:TransactionFee
   pnl: Income:Crypto:PnL
 connections:

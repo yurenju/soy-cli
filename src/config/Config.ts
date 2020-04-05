@@ -1,9 +1,32 @@
 import { readFileSync } from "fs";
 import * as yaml from "js-yaml";
 
+export enum PatternType {
+  Directive = "directive",
+  Transaction = "transaction",
+  Balance = "balance"
+}
+
+export interface Pattern {
+  type: PatternType;
+  field: string;
+  value: string;
+}
+
+export interface Transform {
+  type: PatternType;
+  field: string;
+  value: string;
+}
+
+export interface Rule {
+  pattern: Pattern[];
+  transform: Transform[];
+}
+
 export interface DefaultAccount {
-  deposit: string;
-  withdraw: string;
+  income: string;
+  expenses: string;
   pnl: string;
   base?: string;
   ethTx?: string;
@@ -12,6 +35,7 @@ export interface DefaultAccount {
 export class Config {
   defaultAccount: DefaultAccount;
   outputDir: string;
+  rules: Rule[];
 
   static parse(file: string): any {
     const content = readFileSync(file, { encoding: "utf8" });
