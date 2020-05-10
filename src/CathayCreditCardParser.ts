@@ -11,13 +11,14 @@ import { parseROCDate, patternReplace } from "./Common";
 import { CreditCardBill, CreditCardTransaction } from "./CreditCardBill";
 import Errors from "./Errors";
 import CathayCreditCardConfig from "./config/CathayCreditCardConfig";
+import { EInvoiceService, Invoice, InvDate } from "./EInvoiceService";
 
 const BillColumns = {
   currency: [5, 0],
   previousBalance: [5, 1],
   previousPayment: [5, 2],
   newBalance: [5, 3],
-  minimumDue: [5, 8]
+  minimumDue: [5, 8],
 };
 
 const TxColumns = {
@@ -28,13 +29,21 @@ const TxColumns = {
   country: 6,
   foreignCurrency: 7,
   foreignAmount: 8,
-  exchangeDate: 9
+  exchangeDate: 9,
 };
 
 const TxStartLine = 22;
 
 function getColumn(table: string[][], pos: number[]) {
   return table[pos[0]][pos[1]].trim();
+}
+
+function getMoment(invDate: InvDate): moment.Moment {
+  return moment({
+    year: invDate.year + 1911,
+    month: invDate.month - 1,
+    date: invDate.date,
+  });
 }
 
 export class CathayCreditCardParser {
@@ -44,7 +53,14 @@ export class CathayCreditCardParser {
   static command = "cathay-credit-card";
   static options = [
     "-c, --config <config-file>",
-    "-i, --input-file <input-csv-file>"
+    "-i, --input-file <input-csv-file>",
+  ];
+  static envs = [
+    "EINVOICE_APP_ID",
+    "EINVOICE_API_KEY",
+    "EINVOICE_UUID",
+    "EINVOICE_CARD_ID",
+    "EINVOICE_CARD_KEY",
   ];
 
   constructor(options: any) {
@@ -59,7 +75,7 @@ export class CathayCreditCardParser {
     this.basename = basename(config.inputFile, ".csv");
   }
 
-  parse() {
+  async parse() {
     const { inputFile, outputDir, encoding } = this.config;
 
     const originContent = readFileSync(inputFile);
@@ -68,7 +84,7 @@ export class CathayCreditCardParser {
     mkdir("-p", outputDir);
     this.writeEncodedCSV(encodedContent, outputDir);
     const parsed = this.parseCSV(encodedContent);
-    const beansContent = this.roastBeans(parsed);
+    const beansContent = await this.roastBeans(parsed);
     this.writeBeanFile(beansContent, outputDir);
   }
 
@@ -86,7 +102,7 @@ export class CathayCreditCardParser {
     const txs: CreditCardTransaction[] = [];
 
     const endLine = csv.findIndex(
-      line => line[TxColumns.description] === "正卡本期消費"
+      (line) => line[TxColumns.description] === "正卡本期消費"
     );
 
     if (endLine === -1) {
@@ -94,7 +110,7 @@ export class CathayCreditCardParser {
     }
 
     const year = moment().year();
-    csv.slice(TxStartLine, endLine).forEach(line => {
+    csv.slice(TxStartLine, endLine).forEach((line) => {
       if (!line[TxColumns.transactionDate]) {
         return;
       }
@@ -111,7 +127,7 @@ export class CathayCreditCardParser {
         transactionDate,
         postingDate,
         description,
-        amount
+        amount,
       };
 
       if (line[TxColumns.country]) {
@@ -136,7 +152,7 @@ export class CathayCreditCardParser {
   parseCSV(content: string): CreditCardBill {
     const table = content
       .split("\n")
-      .map(line => line.split(",").map(col => col.trim()));
+      .map((line) => line.split(",").map((col) => col.trim()));
     const matched = table[1][0].match(
       /帳單結帳日：([\d\/]+)\s*繳款截止日（遇假日順延）：([\d\/]+)\/請儘速繳款/
     );
@@ -163,7 +179,7 @@ export class CathayCreditCardParser {
       minimumDue,
       previousBalance,
       previousPayment,
-      transactions: this.parseTxs(table)
+      transactions: this.parseTxs(table),
     };
 
     return bill;
@@ -175,9 +191,9 @@ export class CathayCreditCardParser {
       "country",
       "foreignCurrency",
       "foreignAmount",
-      "exchangeDate"
+      "exchangeDate",
     ];
-    fields.forEach(field => {
+    fields.forEach((field) => {
       const value = tx[field];
       if (value) {
         if (moment.isMoment(value)) {
@@ -192,19 +208,122 @@ export class CathayCreditCardParser {
       }
     });
   }
+  async getInvoices(
+    bill: CreditCardBill,
+    invoiceService: EInvoiceService
+  ): Promise<Invoice[]> {
+    const prevMonth = bill.closingDate.clone().subtract(1, "month");
 
-  roastBeans(bill: CreditCardBill): string {
-    const beanTxs: BeanTransaction[] = bill.transactions.map(tx => {
+    const queryRange = [
+      prevMonth.clone().startOf("month"),
+      prevMonth.clone().endOf("month"),
+      bill.closingDate.clone().startOf("month"),
+      bill.closingDate.clone().endOf("month"),
+    ].map((date) => date.format("YYYY/MM/DD"));
+
+    const prevInvoices = (
+      await invoiceService.getInvoiceList(queryRange[0], queryRange[1])
+    ).details;
+    const currInvoices = (
+      await invoiceService.getInvoiceList(queryRange[2], queryRange[3])
+    ).details;
+
+    return [...prevInvoices, ...currInvoices];
+  }
+
+  async roastBeans(bill: CreditCardBill): Promise<string> {
+    let invoiceService: EInvoiceService;
+
+    const txMetadataFields = [
+      "invNum",
+      "sellerName",
+      "sellerAddress",
+      "sellerBan",
+      "invoiceTime",
+    ];
+    const dirMetadataFields = ["description", "quantity", "unitPrice"];
+
+    if (this.config.einvoiceIntegration) {
+      const satisfied = CathayCreditCardParser.envs.every(
+        (key) => process.env[key]
+      );
+      if (!satisfied) {
+        throw new Error(Errors.RequiredEnvsNotSatisfied);
+      }
+
+      invoiceService = new EInvoiceService(
+        process.env.EINVOICE_APP_ID,
+        process.env.EINVOICE_API_KEY,
+        process.env.EINVOICE_UUID,
+        process.env.EINVOICE_CARD_ID,
+        process.env.EINVOICE_CARD_KEY
+      );
+    }
+
+    const invoiceMap: { [key: string]: Invoice } = {};
+    const invoices = invoiceService
+      ? await this.getInvoices(bill, invoiceService)
+      : [];
+
+    invoices.forEach((invoice) => {
+      const date = getMoment(invoice.invDate);
+      const key = `${date.format("YYYY-MM-DD")}:${invoice.amount}`;
+      invoiceMap[key] = invoice;
+    });
+
+    const beanTxs: BeanTransaction[] = [];
+
+    for (let i = 0; i < bill.transactions.length; i++) {
+      const tx = bill.transactions[i];
       const txDate = tx.transactionDate.format("YYYY-MM-DD");
       const beanTx = new BeanTransaction(txDate, "*", "", tx.description);
       const metadata = {
-        source: "credit-card-bill"
+        source: "credit-card-bill",
       };
       beanTx.metadata = metadata;
       this.fillTxMetadata(beanTx, tx);
 
-      if (this.config.einvoiceIntegration) {
-        //TBD
+      const key = `${beanTx.date}:${tx.amount}`;
+      const invoice = invoiceMap[key];
+
+      if (invoice) {
+        const date = getMoment(invoice.invDate);
+        const detail = await invoiceService.getInvoiceDetail(
+          invoice.invNum,
+          date.format("YYYY/MM/DD"),
+          invoice.amount
+        );
+
+        if (detail.code === 200) {
+          beanTx.metadata["source"] = "invoice";
+          txMetadataFields.forEach((field) => {
+            beanTx.metadata[field] = detail[field];
+          });
+
+          const dirs: Directive[] = detail.details.map((detail) => {
+            const dir = new Directive(
+              this.config.defaultAccount.expenses,
+              detail.amount,
+              "TWD"
+            );
+            dirMetadataFields.forEach((field) => {
+              dir.metadata[field] = detail[field];
+            });
+
+            return dir;
+          });
+          const baseAccount = new Directive(this.config.defaultAccount.base);
+          beanTx.directives.push(...dirs, baseAccount);
+        } else {
+          const params = [
+            invoice.invNum,
+            date.format("YYYY/MM/DD"),
+            invoice.amount,
+          ]
+            .join(",")
+            .replace('"', "");
+          beanTx.metadata["error"] = params;
+        }
       } else {
         const expense = new Directive(
           this.config.defaultAccount.expenses,
@@ -215,13 +334,13 @@ export class CathayCreditCardParser {
         beanTx.directives.push(expense, baseAccount);
       }
 
-      return beanTx;
-    });
+      beanTxs.push(beanTx);
+    }
 
-    beanTxs.forEach(tx =>
-      tx.directives.forEach(dir => patternReplace(dir, tx, this.config.rules))
+    beanTxs.forEach((tx) =>
+      tx.directives.forEach((dir) => patternReplace(dir, tx, this.config.rules))
     );
 
-    return beanTxs.map(tx => tx.toString()).join("\n\n");
+    return beanTxs.map((tx) => tx.toString(true)).join("\n\n");
   }
 }

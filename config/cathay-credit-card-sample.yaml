@@ -3,7 +3,7 @@ defaultAccount:
   income: Income:Unknown
   base: Liabilities:CreditCard:Cathay
 encoding: big5
-einvoiceIntegration: false
+einvoiceIntegration: true
 rules:
   - pattern:
       - type: transaction
@@ -16,7 +16,3 @@ rules:
       - type: directive
         field: account
         value: Income:CreditCard:Reward
-
-
-
-
