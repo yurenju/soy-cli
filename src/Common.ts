@@ -37,13 +37,14 @@ export function patternReplace(
 ) {
   rules.forEach(({ pattern, transform }) => {
     const matched = pattern.every(({ type, query, value }) => {
+      const re = new RegExp(value);
       const actual =
         type === PatternType.Directive
           ? ptr.get(dir, query)
           : ptr.get(tx, query);
 
       if (actual && typeof actual === "string") {
-        return actual.includes(value);
+        return re.test(actual);
       } else {
         return false;
       }

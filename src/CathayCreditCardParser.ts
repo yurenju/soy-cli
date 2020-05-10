@@ -231,6 +231,16 @@ export class CathayCreditCardParser {
     return [...prevInvoices, ...currInvoices];
   }
 
+  getDefaultExpenses(tx: CreditCardTransaction) {
+    const expense = new Directive(
+      this.config.defaultAccount.expenses,
+      tx.amount.toString(),
+      "TWD"
+    );
+    const baseAccount = new Directive(this.config.defaultAccount.base);
+    return [expense, baseAccount];
+  }
+
   async roastBeans(bill: CreditCardBill): Promise<string> {
     let invoiceService: EInvoiceService;
 
@@ -323,15 +333,10 @@ export class CathayCreditCardParser {
             .join(",")
             .replace('"', "");
           beanTx.metadata["error"] = params;
+          beanTx.directives.push(...this.getDefaultExpenses(tx));
         }
       } else {
-        const expense = new Directive(
-          this.config.defaultAccount.expenses,
-          tx.amount.toString(),
-          "TWD"
-        );
-        const baseAccount = new Directive(this.config.defaultAccount.base);
-        beanTx.directives.push(expense, baseAccount);
+        beanTx.directives.push(...this.getDefaultExpenses(tx));
       }
 
       beanTxs.push(beanTx);
