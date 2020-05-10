@@ -18,7 +18,7 @@ export class CathayBankParser {
   static command = "cathay-bank";
   static options = [
     "-c, --config <config-file>",
-    "-i, --input-file <input-csv-file>"
+    "-i, --input-file <input-csv-file>",
   ];
 
   constructor(options: any) {
@@ -57,16 +57,10 @@ export class CathayBankParser {
     const csvOptions = {
       relax_column_count: true,
       columns: true,
-      trim: true
+      trim: true,
     };
 
-    return parse(
-      content
-        .split("\n")
-        .slice(1)
-        .join("\n"),
-      csvOptions
-    );
+    return parse(content.split("\n").slice(1).join("\n"), csvOptions);
   }
 
   getTxType(record): TxType {
@@ -85,13 +79,13 @@ export class CathayBankParser {
     const { base: baseAccount } = defaultAccount;
 
     let last;
-    csvRecords.forEach(record => {
+    csvRecords.forEach((record) => {
       last = record;
       const date = moment(record["日期"], "YYYYMMDD");
       const fields = {
         說明: "description",
         備註: "note",
-        特別備註: "extraNote"
+        特別備註: "extraNote",
       };
       const narration = record["說明"].trim();
       const tx = new BeanTransaction(
@@ -123,8 +117,8 @@ export class CathayBankParser {
       txs.push(tx);
     });
 
-    txs.forEach(tx =>
-      tx.directives.forEach(dir => patternReplace(dir, tx, this.config.rules))
+    txs.forEach((tx) =>
+      tx.directives.forEach((dir) => patternReplace(dir, tx, this.config.rules))
     );
 
     const balanceAmount = last["餘額"];
@@ -133,6 +127,6 @@ export class CathayBankParser {
       .format("YYYY-MM-DD");
     const balance = `${date} balance ${baseAccount} ${balanceAmount} TWD\n`;
 
-    return txs.map(t => t.toString()).join("\n\n") + "\n\n" + balance;
+    return txs.map((t) => t.toString(true)).join("\n\n") + "\n\n" + balance;
   }
 }
