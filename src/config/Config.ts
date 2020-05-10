@@ -4,18 +4,18 @@ import * as yaml from "js-yaml";
 export enum PatternType {
   Directive = "directive",
   Transaction = "transaction",
-  Balance = "balance"
+  Balance = "balance",
 }
 
 export interface Pattern {
   type: PatternType;
-  field: string;
+  query: string;
   value: string;
 }
 
 export interface Transform {
   type: PatternType;
-  field: string;
+  query: string;
   value: string;
 }
 

@@ -7,12 +7,12 @@ einvoiceIntegration: true
 rules:
   - pattern:
       - type: transaction
-        field: narration
+        query: /narration
         value: ＫＯＫＯ一般回饋
       - type: directive
-        field: account
+        query: /account
         value: Expenses:Unknown
     transform:
       - type: directive
-        field: account
+        query: /account
         value: Income:CreditCard:Reward

@@ -22,7 +22,7 @@ function createEthTx(timeStamp = ""): EthTx {
     from: "",
     to: "",
     gasUsed: "",
-    gasPrice: ""
+    gasPrice: "",
   };
 }
 
@@ -39,7 +39,7 @@ function createTransfer(
     value,
     timeStamp: "0",
     hash: "",
-    contractAddress: ""
+    contractAddress: "",
   };
 }
 
@@ -110,13 +110,13 @@ describe("CryptoParser", () => {
       const conn: Connection = {
         type: "",
         accountPrefix: "prefix",
-        address: ""
+        address: "",
       };
       const tokenMap: TokenMetadataMap = {
         SYM: {
           contractAddress: "",
-          tokenDecimal: "3"
-        }
+          tokenDecimal: "3",
+        },
       };
       const balances = await parser.getBalances(tx, tokenMap, conn);
       expect(balances.length).to.eq(1);
@@ -167,8 +167,8 @@ describe("CryptoParser", () => {
           value: "123",
           timeStamp: "0",
           hash: "hash",
-          contractAddress: "contract-address"
-        }
+          contractAddress: "contract-address",
+        },
       ];
 
       const d = parser.getERC20Directives(transfers);
@@ -191,8 +191,8 @@ describe("CryptoParser", () => {
           value: "123",
           timeStamp: "0",
           hash: "hash",
-          contractAddress: "contract-address"
-        }
+          contractAddress: "contract-address",
+        },
       ];
 
       const d = parser.getERC20Directives(transfers);
@@ -215,7 +215,7 @@ describe("CryptoParser", () => {
           value: "123",
           timeStamp: "0",
           hash: "hash",
-          contractAddress: "contract-address"
+          contractAddress: "contract-address",
         },
         {
           from: "somewhere",
@@ -225,8 +225,8 @@ describe("CryptoParser", () => {
           value: "55660000",
           timeStamp: "0",
           hash: "hash",
-          contractAddress: "contract-address"
-        }
+          contractAddress: "contract-address",
+        },
       ];
 
       const d = parser.getERC20Directives(transfers);
@@ -305,18 +305,18 @@ describe("CryptoParser", () => {
   describe("directiveTransform", () => {
     it("transform matched field to new value", () => {
       const data = {
-        account: "test-account"
+        account: "test-account",
       };
-      directiveTransform(data, "account", "new-account");
+      directiveTransform(data, "/account", "new-account");
       expect(data.account).to.eq("new-account");
     });
 
     it("transform account for symbol", () => {
       const data = {
         account: "test-account:ETH-SYM",
-        symbol: "ETH-SYM"
+        symbol: "ETH-SYM",
       };
-      directiveTransform(data, "symbol", "SYM");
+      directiveTransform(data, "/symbol", "SYM");
       expect(data.account).to.eq("test-account:SYM");
       expect(data.symbol).to.eq("SYM");
     });

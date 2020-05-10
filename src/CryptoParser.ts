@@ -105,7 +105,7 @@ export class CryptoParser {
     const meta = Object.entries(tokensMetadata);
     for (let j = 0; j < meta.length; j++) {
       const [symbol, info] = meta[j];
-      if (excludeCoins.find(coin => coin === symbol)) {
+      if (excludeCoins.find((coin) => coin === symbol)) {
         continue;
       }
       const { contractAddress, tokenDecimal } = info;
@@ -118,10 +118,10 @@ export class CryptoParser {
       const account = `${accountPrefix}:${symbol}`;
       const data = { date, account, balance, symbol };
 
-      rules.forEach(rule =>
-        rule.pattern.forEach(({ type, field, value }) => {
+      rules.forEach((rule) =>
+        rule.pattern.forEach(({ type, query: field, value }) => {
           if (type === PatternType.Balance && data[field] === value) {
-            rule.transform.forEach(({ field, value }) =>
+            rule.transform.forEach(({ query: field, value }) =>
               directiveTransform(data, field, value)
             );
           }
@@ -150,7 +150,7 @@ export class CryptoParser {
       if (!tokensMetadata[transfer.tokenSymbol]) {
         tokensMetadata[transfer.tokenSymbol] = {
           contractAddress: transfer.contractAddress,
-          tokenDecimal: transfer.tokenDecimal
+          tokenDecimal: transfer.tokenDecimal,
         };
       }
 
@@ -162,7 +162,7 @@ export class CryptoParser {
 
       const tx = txMap[transfer.hash];
       const duplicated = tx.transfers.some(
-        tr =>
+        (tr) =>
           tr.from === transfer.from &&
           tr.to === transfer.to &&
           tr.value === transfer.value
@@ -173,7 +173,7 @@ export class CryptoParser {
       }
     }
 
-    internalTransfers.forEach(transfer => {
+    internalTransfers.forEach((transfer) => {
       const tx = txMap[transfer.hash];
       tx.internalTransfers.push(transfer);
     });
@@ -211,7 +211,7 @@ export class CryptoParser {
   getInternalDirectives(transfers: EthTx[]) {
     const { defaultAccount } = this.config;
     const dirs = [];
-    transfers.forEach(transfer => {
+    transfers.forEach((transfer) => {
       const { from, to, value } = transfer;
 
       const fromConn = this.getConnection(from);
@@ -244,10 +244,10 @@ export class CryptoParser {
   getERC20Directives(transfers: ERC20Transfer[]) {
     const { defaultAccount, excludeCoins } = this.config;
     const dirs = [];
-    transfers.forEach(transfer => {
+    transfers.forEach((transfer) => {
       const { from, to, tokenSymbol, tokenDecimal, value } = transfer;
 
-      if (excludeCoins.find(coin => coin === tokenSymbol)) {
+      if (excludeCoins.find((coin) => coin === tokenSymbol)) {
         return;
       }
 
@@ -295,15 +295,15 @@ export class CryptoParser {
   getDateCoinMap(beans: BeanTransaction[]): DateCoinMap {
     const map: DateCoinMap = {};
 
-    beans.forEach(bean => {
+    beans.forEach((bean) => {
       if (!map[bean.date]) {
         map[bean.date] = {};
       }
 
       const coinsMap = map[bean.date];
 
-      bean.directives.forEach(d => {
-        const coin = this.config.coins.find(c => c.symbol === d.symbol);
+      bean.directives.forEach((d) => {
+        const coin = this.config.coins.find((c) => c.symbol === d.symbol);
         if (!coin) {
           return;
         }
@@ -324,7 +324,7 @@ export class CryptoParser {
     const tasks: Promise<HistoryPrice>[] = [];
 
     Object.entries(map).forEach(([date, coinsMap]) => {
-      Object.keys(coinsMap).forEach(id => {
+      Object.keys(coinsMap).forEach((id) => {
         tasks.push(this.coingecko.getHistoryPrice(date, id));
       });
     });
@@ -335,7 +335,7 @@ export class CryptoParser {
         console.error(`cannot find ${id} at ${date}`);
         return;
       }
-      map[date][id].forEach(dir => {
+      map[date][id].forEach((dir) => {
         if (!result.market_data) {
           console.error(
             `unexpected result: ${JSON.stringify(result, null, 2)}`
@@ -378,7 +378,7 @@ export class CryptoParser {
       timeStamp,
       gasUsed,
       gasPrice,
-      hash
+      hash,
     } = tx;
     const { defaultAccount, rules } = this.config;
 
@@ -425,7 +425,7 @@ export class CryptoParser {
       directives.push(...dirs);
     }
 
-    beanTx.directives.forEach(dir => patternReplace(dir, beanTx, rules));
+    beanTx.directives.forEach((dir) => patternReplace(dir, beanTx, rules));
     const pnl = new Directive(defaultAccount.pnl);
     beanTx.directives.push(pnl);
     return beanTx;
@@ -450,7 +450,7 @@ export class CryptoParser {
         );
 
         // convert to map
-        txListRes.result.forEach(tx => {
+        txListRes.result.forEach((tx) => {
           if (!ethTxnMap[tx.hash]) {
             ethTxnMap[tx.hash] = tx;
             tx.transfers = [];
@@ -467,7 +467,7 @@ export class CryptoParser {
 
         // get last balance
         const lastTx = [tokenRes, txListRes]
-          .map(res => res.result.slice().pop())
+          .map((res) => res.result.slice().pop())
           .sort((a, b) => parseInt(a.blockNumber) - parseInt(b.blockNumber))
           .pop();
 
@@ -481,11 +481,13 @@ export class CryptoParser {
       (a, b) => parseInt(a.timeStamp) - parseInt(b.timeStamp)
     );
 
-    beanTxs.push(...txList.map(tx => this.toBeanTx(tx)));
+    beanTxs.push(...txList.map((tx) => this.toBeanTx(tx)));
 
     await this.fillPrices(beanTxs);
     return (
-      beanTxs.map(t => t.toString()).join("\n\n") + "\n\n" + balances.join("\n")
+      beanTxs.map((t) => t.toString()).join("\n\n") +
+      "\n\n" +
+      balances.join("\n")
     );
   }
 

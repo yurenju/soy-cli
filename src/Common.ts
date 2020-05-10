@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import * as iconv from "iconv-lite";
 import parse from "csv-parse/lib/sync";
 import moment, { Moment } from "moment";
+import ptr from "json-ptr";
 import Directive from "./Directive";
 import BeanTransaction from "./BeanTransaction";
 import { Rule, PatternType } from "./config/Config";
@@ -19,14 +20,14 @@ export function parseROCDate(dateStr: string): Moment {
 
 export function directiveTransform(
   data: Record<string, any>,
-  field: string,
+  query: string,
   value: any
 ) {
-  if (field === "symbol") {
+  if (query === "/symbol") {
     const regex = new RegExp(`${data.symbol}$`);
     data.account = data.account.replace(regex, value);
   }
-  data[field] = value;
+  ptr.set(data, query, value);
 }
 
 export function patternReplace(
@@ -35,21 +36,26 @@ export function patternReplace(
   rules: Rule[]
 ) {
   rules.forEach(({ pattern, transform }) => {
-    const matched = pattern.every(({ type, field, value }) => {
-      if (type === PatternType.Directive) {
-        return dir[field] === value || dir.metadata[field] === value;
-      } else if (type === PatternType.Transaction) {
-        return tx[field] === value || tx.metadata[field] === value;
+    const matched = pattern.every(({ type, query, value }) => {
+      const actual =
+        type === PatternType.Directive
+          ? ptr.get(dir, query)
+          : ptr.get(tx, query);
+
+      if (actual && typeof actual === "string") {
+        return actual.includes(value);
+      } else {
+        return false;
       }
     });
 
     if (matched) {
-      transform.forEach(({ type, field, value }) => {
+      transform.forEach(({ type, query, value }) => {
         if (type === PatternType.Directive) {
-          directiveTransform(dir, field, value);
+          directiveTransform(dir, query, value);
         }
         if (type === PatternType.Transaction) {
-          tx[field] = value;
+          ptr.set(tx, query, value);
         }
       });
     }

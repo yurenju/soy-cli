@@ -10,30 +10,30 @@ connections:
 rules:
   - pattern:
     - type: directive
-      field: symbol
+      query: /symbol
       value: ETH-SYM
     transform:
     - type: directive
-      field: symbol
+      query: /symbol
       value: SYM
   - pattern:
     - type: directive
-      field: address
+      query: /metadata/address
       value: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
     transform:
       - type: directive
-        field: account
+        query: /account
         value: Assets:Crypto:DaiSaving
   - pattern:
       - type: transaction
-        field: to
+        query: /metadata/to
         value: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
       - type: directive
-        field: address
+        query: /metadata/address
         value: "0x0000000000000000000000000000000000000000"
     transform:
       - type: directive
-        field: account
+        query: /account
         value: Assets:Crypto:DaiSaving
 excludeCoins:
   - KICK
