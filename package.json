@@ -43,6 +43,7 @@
     "dotenv": "8.2.0",
     "iconv-lite": "^0.5.0",
     "js-yaml": "3.13.1",
+    "json-ptr": "1.2.0",
     "minimist": "^1.2.5",
     "moment": "^2.24.0",
     "node-fetch": "2.6.0",
