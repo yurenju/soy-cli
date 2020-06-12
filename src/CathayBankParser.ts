@@ -8,7 +8,7 @@ import { Config } from "./config/Config";
 import CathayBankConfig from "./config/CathayBankConfig";
 import { plainToClass } from "class-transformer";
 import BeanTransaction from "./BeanTransaction";
-import Directive from "./Directive";
+import Posting from "./Posting";
 import { TxType, patternReplace } from "./Common";
 
 export class CathayBankParser {
@@ -104,21 +104,23 @@ export class CathayBankParser {
       const txType = this.getTxType(record);
 
       if (txType === TxType.Deposit) {
-        tx.directives.push(
-          new Directive(baseAccount, record["存入"], "TWD"),
-          new Directive(defaultAccount.income)
+        tx.postings.push(
+          new Posting(baseAccount, record["存入"], "TWD"),
+          new Posting(defaultAccount.income)
         );
       } else {
-        tx.directives.push(
-          new Directive(defaultAccount.expenses, record["提出"], "TWD"),
-          new Directive(baseAccount)
+        tx.postings.push(
+          new Posting(defaultAccount.expenses, record["提出"], "TWD"),
+          new Posting(baseAccount)
         );
       }
       txs.push(tx);
     });
 
     txs.forEach((tx) =>
-      tx.directives.forEach((dir) => patternReplace(dir, tx, this.config.rules))
+      tx.postings.forEach((posting) =>
+        patternReplace(posting, tx, this.config.rules)
+      )
     );
 
     const balanceAmount = last["餘額"];

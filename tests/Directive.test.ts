@@ -1,27 +1,27 @@
-import Directive from "../src/Directive";
+import Posting from "../src/Posting";
 import { expect } from "chai";
 
-describe("Directive", () => {
+describe("Posting", () => {
   describe("toString()", () => {
     it("with account & amount", () => {
-      const dir = new Directive("TestAccount", "30.0", "USD").toString();
-      expect(dir).to.eq("  TestAccount 30.0 USD");
+      const posting = new Posting("TestAccount", "30.0", "USD").toString();
+      expect(posting).to.eq("  TestAccount 30.0 USD");
     });
 
     it("with account, amount & cost", () => {
-      const dir = new Directive(
+      const posting = new Posting(
         "TestAccount",
         "30.0",
         "USD",
         "30 TWD"
       ).toString();
-      expect(dir).to.eq("  TestAccount 30.0 USD {30 TWD}");
+      expect(posting).to.eq("  TestAccount 30.0 USD {30 TWD}");
     });
 
     it("with metadata", () => {
-      const dir = new Directive("TestAccount", "30.0", "USD");
-      dir.metadata = { tx: "1234" };
-      expect(dir.toString(true)).to.eq(
+      const posting = new Posting("TestAccount", "30.0", "USD");
+      posting.metadata = { tx: "1234" };
+      expect(posting.toString(true)).to.eq(
         `  TestAccount 30.0 USD\n    tx: "1234"`
       );
     });

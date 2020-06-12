@@ -1,4 +1,4 @@
-export default class Directive {
+export default class Posting {
   account: string;
   amount: string;
   cost: string;

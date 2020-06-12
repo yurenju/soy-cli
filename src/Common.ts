@@ -3,7 +3,7 @@ import * as iconv from "iconv-lite";
 import parse from "csv-parse/lib/sync";
 import moment, { Moment } from "moment";
 import ptr from "json-ptr";
-import Directive from "./Directive";
+import Posting from "./Posting";
 import BeanTransaction from "./BeanTransaction";
 import { Rule, PatternType } from "./config/Config";
 
@@ -18,7 +18,7 @@ export function parseROCDate(dateStr: string): Moment {
   return moment(`${year}/${month}/${day}`, "YYYY/MM/DD");
 }
 
-export function directiveTransform(
+export function postingTransform(
   data: Record<string, any>,
   query: string,
   value: any
@@ -31,7 +31,7 @@ export function directiveTransform(
 }
 
 export function patternReplace(
-  dir: Directive,
+  posting: Posting,
   tx: BeanTransaction,
   rules: Rule[]
 ) {
@@ -39,8 +39,8 @@ export function patternReplace(
     const matched = pattern.every(({ type, query, value }) => {
       const re = new RegExp(value);
       const actual =
-        type === PatternType.Directive
-          ? ptr.get(dir, query)
+        type === PatternType.Posting
+          ? ptr.get(posting, query)
           : ptr.get(tx, query);
 
       if (actual && typeof actual === "string") {
@@ -52,8 +52,8 @@ export function patternReplace(
 
     if (matched) {
       transform.forEach(({ type, query, value }) => {
-        if (type === PatternType.Directive) {
-          directiveTransform(dir, query, value);
+        if (type === PatternType.Posting) {
+          postingTransform(posting, query, value);
         }
         if (type === PatternType.Transaction) {
           ptr.set(tx, query, value);

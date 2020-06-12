@@ -9,30 +9,30 @@ connections:
     accountPrefix: Assets:Crypto:TestAccount
 rules:
   - pattern:
-    - type: directive
+    - type: posting
       query: /symbol
       value: ETH-SYM
     transform:
-    - type: directive
+    - type: posting
       query: /symbol
       value: SYM
   - pattern:
-    - type: directive
+    - type: posting
       query: /metadata/address
       value: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
     transform:
-      - type: directive
+      - type: posting
         query: /account
         value: Assets:Crypto:DaiSaving
   - pattern:
       - type: transaction
         query: /metadata/to
         value: "0xd89c56dea56db24a51482e53909b0cfa8bba78aa"
-      - type: directive
+      - type: posting
         query: /metadata/address
         value: "0x0000000000000000000000000000000000000000"
     transform:
-      - type: directive
+      - type: posting
         query: /account
         value: Assets:Crypto:DaiSaving
 excludeCoins:
