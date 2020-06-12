@@ -8,32 +8,32 @@ rules:
       - type: transaction
         query: /metadata/note
         value: 統一發票中獎
-      - type: directive
+      - type: posting
         query: /account
         value: Income:Unknown
     transform:
-      - type: directive
+      - type: posting
         query: /account
         value: Income:InvoiceLottery
   - pattern:
       - type: transaction
         query: /metadata/description
         vale: 信用卡款
-      - type: directive
+      - type: posting
         query: /account
         value: Expenses:Unknown
     transform:
-      - type: directive
+      - type: posting
         query: /account
         value: Liabilities:CreditCard:Cathay
   - pattern:
       - type: transaction
         query: /metadata/description
         vale: 花旗
-      - type: directive
+      - type: posting
         query: /account
         value: Expenses:Unknown
     transform:
-      - type: directive
+      - type: posting
         query: /account
         value: Liabilities:CreditCard:Citi

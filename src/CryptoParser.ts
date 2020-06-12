@@ -5,12 +5,12 @@ import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import { plainToClass } from "class-transformer";
 import { Config, PatternType } from "./config/Config";
-import Directive from "./Directive";
+import Posting from "./Posting";
 import BeanTransaction from "./BeanTransaction";
 import { CryptoConfig, Connection } from "./config/CryptoConfig";
 import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
 import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
-import { directiveTransform, patternReplace } from "./Common";
+import { postingTransform, patternReplace } from "./Common";
 
 dotenv.config();
 
@@ -34,7 +34,7 @@ export interface DateCoinMap {
 }
 
 export interface CoinMap {
-  [coinId: string]: Directive[];
+  [coinId: string]: Posting[];
 }
 
 interface Options {
@@ -122,7 +122,7 @@ export class CryptoParser {
         rule.pattern.forEach(({ type, query: field, value }) => {
           if (type === PatternType.Balance && data[field] === value) {
             rule.transform.forEach(({ query: field, value }) =>
-              directiveTransform(data, field, value)
+              postingTransform(data, field, value)
             );
           }
         })
@@ -179,11 +179,11 @@ export class CryptoParser {
     });
   }
 
-  getETHDirectives(from: string, to: string, value: string): Directive[] {
+  getETHPostings(from: string, to: string, value: string): Posting[] {
     const { defaultAccount } = this.config;
     const fromConn = this.getConnection(from);
     const toConn = this.getConnection(to);
-    const directives = [];
+    const postings = [];
 
     const fromAccount = this.getAccount(
       fromConn?.accountPrefix,
@@ -200,17 +200,17 @@ export class CryptoParser {
     const toVal = this.getValue(value, "18");
     const fromVal = "-" + toVal;
 
-    directives.push(
-      new Directive(fromAccount, fromVal, "ETH"),
-      new Directive(toAccount, toVal, "ETH")
+    postings.push(
+      new Posting(fromAccount, fromVal, "ETH"),
+      new Posting(toAccount, toVal, "ETH")
     );
 
-    return directives;
+    return postings;
   }
 
-  getInternalDirectives(transfers: EthTx[]) {
+  getInternalPostings(transfers: EthTx[]) {
     const { defaultAccount } = this.config;
-    const dirs = [];
+    const postings = [];
     transfers.forEach((transfer) => {
       const { from, to, value } = transfer;
 
@@ -231,19 +231,19 @@ export class CryptoParser {
 
       const amount = this.getValue(value, "18");
       if ((fromConn || transfers.length <= 1) && value !== "0") {
-        dirs.push(new Directive(fromAccount, `-${amount}`, "ETH"));
+        postings.push(new Posting(fromAccount, `-${amount}`, "ETH"));
       }
       if ((toConn || transfers.length <= 1) && value !== "0") {
-        dirs.push(new Directive(toAccount, amount, "ETH"));
+        postings.push(new Posting(toAccount, amount, "ETH"));
       }
     });
 
-    return dirs;
+    return postings;
   }
 
-  getERC20Directives(transfers: ERC20Transfer[]) {
+  getERC20Postings(transfers: ERC20Transfer[]) {
     const { defaultAccount, excludeCoins } = this.config;
-    const dirs = [];
+    const postings = [];
     transfers.forEach((transfer) => {
       const { from, to, tokenSymbol, tokenDecimal, value } = transfer;
 
@@ -277,19 +277,19 @@ export class CryptoParser {
       //   Assets:Crypto:Wallet:CSAI 100 CSAI
       const amount = this.getValue(value, tokenDecimal);
       if ((fromConn || transfers.length <= 1) && value !== "0") {
-        const dir = new Directive(fromAccount, `-${amount}`, tokenSymbol);
-        dir.ambiguousPrice = false;
-        dir.metadata.address = from;
-        dirs.push(dir);
+        const pos = new Posting(fromAccount, `-${amount}`, tokenSymbol);
+        pos.ambiguousPrice = false;
+        pos.metadata.address = from;
+        postings.push(pos);
       }
       if ((toConn || transfers.length <= 1) && value !== "0") {
-        const dir = new Directive(toAccount, amount, tokenSymbol);
-        dir.metadata.address = to;
-        dirs.push(dir);
+        const pos = new Posting(toAccount, amount, tokenSymbol);
+        pos.metadata.address = to;
+        postings.push(pos);
       }
     });
 
-    return dirs;
+    return postings;
   }
 
   getDateCoinMap(beans: BeanTransaction[]): DateCoinMap {
@@ -302,7 +302,7 @@ export class CryptoParser {
 
       const coinsMap = map[bean.date];
 
-      bean.directives.forEach((d) => {
+      bean.postings.forEach((d) => {
         const coin = this.config.coins.find((c) => c.symbol === d.symbol);
         if (!coin) {
           return;
@@ -335,15 +335,15 @@ export class CryptoParser {
         console.error(`cannot find ${id} at ${date}`);
         return;
       }
-      map[date][id].forEach((dir) => {
+      map[date][id].forEach((posting) => {
         if (!result.market_data) {
           console.error(
             `unexpected result: ${JSON.stringify(result, null, 2)}`
           );
           return;
         }
-        if (dir.amount[0] !== "-" || dir.account.match(/^Income:/)) {
-          dir.cost = `${
+        if (posting.amount[0] !== "-" || posting.account.match(/^Income:/)) {
+          posting.cost = `${
             result.market_data.current_price[fiat.toLowerCase()]
           } ${fiat}`;
         }
@@ -393,7 +393,7 @@ export class CryptoParser {
 
     const narration = this.getNarration(tx);
     const beanTx = new BeanTransaction(date, "*", "", narration);
-    const { directives, metadata } = beanTx;
+    const { postings: postings, metadata } = beanTx;
     metadata.tx = hash;
     metadata.from = from;
     metadata.to = to;
@@ -402,32 +402,32 @@ export class CryptoParser {
 
     // Gas
     if (fromConn) {
-      const gasExpense = new Directive(defaultAccount.ethTx, gas, "ETH");
-      const ethAccount = new Directive(
+      const gasExpense = new Posting(defaultAccount.ethTx, gas, "ETH");
+      const ethAccount = new Posting(
         `${fromConn.accountPrefix}:ETH`,
         `-${gas}`,
         "ETH"
       );
       ethAccount.ambiguousPrice = false;
-      directives.push(gasExpense, ethAccount);
+      postings.push(gasExpense, ethAccount);
     }
 
     // ERC20 transfer or exchange
-    const dirs = this.getERC20Directives(transfers);
-    directives.push(...dirs);
+    postings.push(...this.getERC20Postings(transfers));
 
     // internal transfer
-    directives.push(...this.getInternalDirectives(internalTransfers));
+    postings.push(...this.getInternalPostings(internalTransfers));
 
     // EtH Transfer
     if (val !== "0") {
-      const dirs = this.getETHDirectives(from, to, value);
-      directives.push(...dirs);
+      postings.push(...this.getETHPostings(from, to, value));
     }
 
-    beanTx.directives.forEach((dir) => patternReplace(dir, beanTx, rules));
-    const pnl = new Directive(defaultAccount.pnl);
-    beanTx.directives.push(pnl);
+    beanTx.postings.forEach((posting) =>
+      patternReplace(posting, beanTx, rules)
+    );
+    const pnl = new Posting(defaultAccount.pnl);
+    beanTx.postings.push(pnl);
     return beanTx;
   }
 

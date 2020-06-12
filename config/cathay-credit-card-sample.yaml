@@ -9,10 +9,10 @@ rules:
       - type: transaction
         query: /narration
         value: ＫＯＫＯ一般回饋
-      - type: directive
+      - type: posting
         query: /account
         value: Expenses:Unknown
     transform:
-      - type: directive
+      - type: posting
         query: /account
         value: Income:CreditCard:Reward

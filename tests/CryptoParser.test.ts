@@ -4,10 +4,10 @@ import { mock, instance, when, anyString } from "ts-mockito";
 import { Etherscan, EthTx, ERC20Transfer } from "../src/services/Etherscan";
 import { Connection, CryptoConfig } from "../src/config/CryptoConfig";
 import moment = require("moment");
-import Directive from "../src/Directive";
+import Posting from "../src/Posting";
 import BeanTransaction from "../src/BeanTransaction";
 import BigNumber from "bignumber.js";
-import { patternReplace, directiveTransform } from "../src/Common";
+import { patternReplace, postingTransform } from "../src/Common";
 import { PatternType, Rule, Config } from "../src/config/Config";
 import { plainToClass } from "class-transformer";
 
@@ -124,9 +124,9 @@ describe("CryptoParser", () => {
     });
   });
 
-  describe("getETHDirectives()", () => {
+  describe("getETHPostings()", () => {
     it("transfer from our account to unknown expense", () => {
-      const d = parser.getETHDirectives(
+      const d = parser.getETHPostings(
         "0x6344793a588c7b3076bf74562463998b2966ee91",
         "unknown-to-address",
         "1230000000000000000"
@@ -141,7 +141,7 @@ describe("CryptoParser", () => {
     });
 
     it("transfer from unknown income to our account", () => {
-      const d = parser.getETHDirectives(
+      const d = parser.getETHPostings(
         "unknown-from-address",
         "0x6344793a588c7b3076bf74562463998b2966ee91",
         "1230000000000000000"
@@ -156,7 +156,7 @@ describe("CryptoParser", () => {
     });
   });
 
-  describe("getERC20Directives()", () => {
+  describe("getERC20Postings()", () => {
     it("single transfer from our own address", () => {
       const transfers: ERC20Transfer[] = [
         {
@@ -171,7 +171,7 @@ describe("CryptoParser", () => {
         },
       ];
 
-      const d = parser.getERC20Directives(transfers);
+      const d = parser.getERC20Postings(transfers);
       expect(d.length).to.eq(2);
       expect(d[0].account).to.eq("Assets:Crypto:TestAccount:SYM");
       expect(d[0].amount).to.eq("-1.23");
@@ -195,7 +195,7 @@ describe("CryptoParser", () => {
         },
       ];
 
-      const d = parser.getERC20Directives(transfers);
+      const d = parser.getERC20Postings(transfers);
       expect(d.length).to.eq(2);
       expect(d[0].account).to.eq("Income:Unknown");
       expect(d[0].amount).to.eq("-1.23");
@@ -229,7 +229,7 @@ describe("CryptoParser", () => {
         },
       ];
 
-      const d = parser.getERC20Directives(transfers);
+      const d = parser.getERC20Postings(transfers);
       expect(d.length).to.eq(2);
       expect(d[0].account).to.eq("Assets:Crypto:TestAccount:SYM");
       expect(d[0].amount).to.eq("-1.23");
@@ -242,7 +242,7 @@ describe("CryptoParser", () => {
 
   describe("patternReplace()", () => {
     it("replace symbol", () => {
-      const d = new Directive("TestAccount:ETH-SYM", "1.23", "ETH-SYM");
+      const d = new Posting("TestAccount:ETH-SYM", "1.23", "ETH-SYM");
       patternReplace(d, new BeanTransaction(), config.rules);
       expect(d.symbol).to.eq("SYM");
       expect(d.account).to.eq("TestAccount:SYM");
@@ -251,7 +251,7 @@ describe("CryptoParser", () => {
 
   describe("getDateCoinMap()", () => {
     it("get map with id", () => {
-      const d = new Directive("TestAccount", "12.3", "BAT");
+      const d = new Posting("TestAccount", "12.3", "BAT");
       const tx = new BeanTransaction("2020-02-25", "*", "", "narration", [d]);
       const map = parser.getDateCoinMap([tx]);
       expect(Object.keys(map).length).to.eq(1);
@@ -290,7 +290,7 @@ describe("CryptoParser", () => {
   });
 
   describe("toBeanTx()", () => {
-    it("has gas directive if from field if our address", () => {
+    it("has gas posting if from field if our address", () => {
       const tx = createEthTx();
       const decimals = new BigNumber(10).pow(18);
       tx.from = "0x6344793a588c7b3076bf74562463998b2966ee91";
@@ -298,16 +298,16 @@ describe("CryptoParser", () => {
       tx.gasPrice = new BigNumber(4).multipliedBy(decimals).toString();
 
       const bean = parser.toBeanTx(tx);
-      expect(bean.directives[0].amount).to.eq("12");
+      expect(bean.postings[0].amount).to.eq("12");
     });
   });
 
-  describe("directiveTransform", () => {
+  describe("postingTransform", () => {
     it("transform matched field to new value", () => {
       const data = {
         account: "test-account",
       };
-      directiveTransform(data, "/account", "new-account");
+      postingTransform(data, "/account", "new-account");
       expect(data.account).to.eq("new-account");
     });
 
@@ -316,7 +316,7 @@ describe("CryptoParser", () => {
         account: "test-account:ETH-SYM",
         symbol: "ETH-SYM",
       };
-      directiveTransform(data, "/symbol", "SYM");
+      postingTransform(data, "/symbol", "SYM");
       expect(data.account).to.eq("test-account:SYM");
       expect(data.symbol).to.eq("SYM");
     });

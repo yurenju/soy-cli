@@ -1,5 +1,5 @@
 import moment = require("moment");
-import Directive from "./Directive";
+import Posting from "./Posting";
 
 export default class BeanTransaction {
   date: string;
@@ -7,26 +7,26 @@ export default class BeanTransaction {
   payee: string;
   narration: string;
   metadata: { [key: string]: string };
-  directives: Directive[];
+  postings: Posting[];
 
   constructor(
     date = moment().format("YYYY-MM-DD"),
     flag = "*",
     payee = "",
     narration = "",
-    directives = [],
+    postings = [],
     metadata = {}
   ) {
     this.date = date;
     this.flag = flag;
     this.payee = payee;
     this.narration = narration;
-    this.directives = directives;
+    this.postings = postings;
     this.metadata = metadata;
   }
 
   toString(showMetadata = false) {
-    const { date, flag, payee, narration, directives, metadata } = this;
+    const { date, flag, payee, narration, postings, metadata } = this;
     const lines = [];
     const firstArr = [date, flag];
     if (payee) {
@@ -43,7 +43,7 @@ export default class BeanTransaction {
     if (showMetadata) {
       lines.push(...attrsLines);
     }
-    lines.push(...directives.map((d) => d.toString(showMetadata)));
+    lines.push(...postings.map((d) => d.toString(showMetadata)));
 
     return lines.join("\n");
   }

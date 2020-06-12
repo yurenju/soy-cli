@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import * as yaml from "js-yaml";
 
 export enum PatternType {
-  Directive = "directive",
+  Posting = "posting",
   Transaction = "transaction",
   Balance = "balance",
 }

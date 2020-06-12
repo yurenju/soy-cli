@@ -6,7 +6,7 @@ import moment from "moment";
 import { Config } from "./config/Config";
 import { plainToClass } from "class-transformer";
 import BeanTransaction from "./BeanTransaction";
-import Directive from "./Directive";
+import Posting from "./Posting";
 import { parseROCDate, patternReplace } from "./Common";
 import { CreditCardBill, CreditCardTransaction } from "./CreditCardBill";
 import Errors from "./Errors";
@@ -232,12 +232,12 @@ export class CathayCreditCardParser {
   }
 
   getDefaultExpenses(tx: CreditCardTransaction) {
-    const expense = new Directive(
+    const expense = new Posting(
       this.config.defaultAccount.expenses,
       tx.amount.toString(),
       "TWD"
     );
-    const baseAccount = new Directive(this.config.defaultAccount.base);
+    const baseAccount = new Posting(this.config.defaultAccount.base);
     return [expense, baseAccount];
   }
 
@@ -251,7 +251,7 @@ export class CathayCreditCardParser {
       "sellerBan",
       "invoiceTime",
     ];
-    const dirMetadataFields = ["description", "quantity", "unitPrice"];
+    const postingMetadataFields = ["description", "quantity", "unitPrice"];
 
     if (this.config.einvoiceIntegration) {
       const satisfied = CathayCreditCardParser.envs.every(
@@ -310,20 +310,20 @@ export class CathayCreditCardParser {
             beanTx.metadata[field] = detail[field];
           });
 
-          const dirs: Directive[] = detail.details.map((detail) => {
-            const dir = new Directive(
+          const postings: Posting[] = detail.details.map((detail) => {
+            const posting = new Posting(
               this.config.defaultAccount.expenses,
               detail.amount,
               "TWD"
             );
-            dirMetadataFields.forEach((field) => {
-              dir.metadata[field] = detail[field];
+            postingMetadataFields.forEach((field) => {
+              posting.metadata[field] = detail[field];
             });
 
-            return dir;
+            return posting;
           });
-          const baseAccount = new Directive(this.config.defaultAccount.base);
-          beanTx.directives.push(...dirs, baseAccount);
+          const baseAccount = new Posting(this.config.defaultAccount.base);
+          beanTx.postings.push(...postings, baseAccount);
         } else {
           const params = [
             invoice.invNum,
@@ -333,17 +333,19 @@ export class CathayCreditCardParser {
             .join(",")
             .replace('"', "");
           beanTx.metadata["error"] = params;
-          beanTx.directives.push(...this.getDefaultExpenses(tx));
+          beanTx.postings.push(...this.getDefaultExpenses(tx));
         }
       } else {
-        beanTx.directives.push(...this.getDefaultExpenses(tx));
+        beanTx.postings.push(...this.getDefaultExpenses(tx));
       }
 
       beanTxs.push(beanTx);
     }
 
     beanTxs.forEach((tx) =>
-      tx.directives.forEach((dir) => patternReplace(dir, tx, this.config.rules))
+      tx.postings.forEach((posting) =>
+        patternReplace(posting, tx, this.config.rules)
+      )
     );
 
     return beanTxs.map((tx) => tx.toString(true)).join("\n\n");
