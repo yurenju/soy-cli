@@ -12,6 +12,8 @@
         "envs",
         "ethereum",
         "etherscan",
-        "filepath"
+        "filepath",
+        "jsonpointer",
+        "marcj"
     ]
 }

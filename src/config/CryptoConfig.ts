@@ -12,9 +12,9 @@ export interface Coin {
 }
 
 export class CryptoConfig extends Config {
-  connections: Connection[];
-  excludeCoins: string[];
-  timestamp: { ethereum: string };
-  coins: Coin[];
-  fiat: string;
+  connections: Connection[] = [];
+  excludeCoins: string[] = [];
+  timestamp: { ethereum: string } = { ethereum: "" };
+  coins: Coin[] = [];
+  fiat: string = "TWD";
 }

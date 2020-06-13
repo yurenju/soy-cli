@@ -7,9 +7,10 @@ import moment from "moment";
 import { Config } from "./config/Config";
 import CathayBankConfig from "./config/CathayBankConfig";
 import { plainToClass } from "class-transformer";
-import BeanTransaction from "./BeanTransaction";
-import Posting from "./Posting";
+import { Transaction } from "./models/Transaction";
+import { Posting } from "./models/Posting";
 import { TxType, patternReplace } from "./Common";
+import { Directive, Balance } from "./models";
 
 export class CathayBankParser {
   config: CathayBankConfig;
@@ -63,7 +64,7 @@ export class CathayBankParser {
     return parse(content.split("\n").slice(1).join("\n"), csvOptions);
   }
 
-  getTxType(record): TxType {
+  getTxType(record: Record<string, string>): TxType {
     if (record["提出"]) {
       return TxType.Withdraw;
     } else if (record["存入"]) {
@@ -73,8 +74,8 @@ export class CathayBankParser {
     }
   }
 
-  roastBeans(csvRecords: any): string {
-    const txs: BeanTransaction[] = [];
+  roastBeans(csvRecords: Record<string, string>[]): string {
+    const txs: Transaction[] = [];
     const { defaultAccount } = this.config;
     const { base: baseAccount } = defaultAccount;
 
@@ -82,22 +83,19 @@ export class CathayBankParser {
     csvRecords.forEach((record) => {
       last = record;
       const date = moment(record["日期"], "YYYYMMDD");
-      const fields = {
+      const fieldMapping = {
         說明: "description",
         備註: "note",
         特別備註: "extraNote",
       };
       const narration = record["說明"].trim();
-      const tx = new BeanTransaction(
-        date.format("YYYY-MM-DD"),
-        "*",
-        "",
-        narration
-      );
-      tx.metadata = {};
-      Object.entries(fields).forEach(([key, value]) => {
-        if (record[key]) {
-          tx.metadata[value] = record[key].replace(/\s+/g, " ");
+      const tx: Transaction = new Transaction({
+        date,
+        narration,
+      });
+      Object.entries(fieldMapping).forEach(([csvField, txField]) => {
+        if (record[csvField]) {
+          tx.metadata[txField] = record[csvField].replace(/\s+/g, " ");
         }
       });
 
@@ -105,13 +103,21 @@ export class CathayBankParser {
 
       if (txType === TxType.Deposit) {
         tx.postings.push(
-          new Posting(baseAccount, record["存入"], "TWD"),
-          new Posting(defaultAccount.income)
+          new Posting({
+            account: baseAccount,
+            amount: record["存入"],
+            symbol: "TWD",
+          }),
+          new Posting({ account: defaultAccount.income })
         );
       } else {
         tx.postings.push(
-          new Posting(defaultAccount.expenses, record["提出"], "TWD"),
-          new Posting(baseAccount)
+          new Posting({
+            account: defaultAccount.expenses,
+            amount: record["提出"],
+            symbol: "TWD",
+          }),
+          new Posting({ account: baseAccount })
         );
       }
       txs.push(tx);
@@ -123,12 +129,16 @@ export class CathayBankParser {
       )
     );
 
-    const balanceAmount = last["餘額"];
-    const date = moment(last["日期"], "YYYYMMDD")
-      .add(1, "day")
-      .format("YYYY-MM-DD");
-    const balance = `${date} balance ${baseAccount} ${balanceAmount} TWD\n`;
+    const directives: Directive[] = [...txs];
+    if (last) {
+      const balance = new Balance({
+        account: baseAccount,
+        amount: last["餘額"],
+        date: moment(last["日期"], "YYYYMMDD").add(1, "day"),
+      });
+      directives.push(balance);
+    }
 
-    return txs.map((t) => t.toString(true)).join("\n\n") + "\n\n" + balance;
+    return directives.map((dir) => dir.toString()).join("\n\n");
   }
 }

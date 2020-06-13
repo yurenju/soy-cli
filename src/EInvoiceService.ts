@@ -51,6 +51,7 @@ export interface InvoiceListResponse {
 }
 
 export interface InvoiceDetail {
+  [key: string]: string;
   rowNum: string;
   description: string;
   quantity: string;
@@ -59,6 +60,7 @@ export interface InvoiceDetail {
 }
 
 export interface InvoiceDetailResponse {
+  [key: string]: any;
   v: string;
   code: number;
   msg: string;
