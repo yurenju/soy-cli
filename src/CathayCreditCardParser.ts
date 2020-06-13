@@ -348,6 +348,6 @@ export class CathayCreditCardParser {
       )
     );
 
-    return beanTxs.map((tx) => tx.toString(true)).join("\n\n");
+    return beanTxs.map((tx) => tx.toString()).join("\n\n");
   }
 }

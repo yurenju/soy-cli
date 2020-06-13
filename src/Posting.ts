@@ -25,7 +25,7 @@ export default class Posting {
     this.ambiguousPrice = ambiguousPrice;
   }
 
-  toString(showMetaData = false) {
+  toString() {
     const { account, amount, symbol, cost, price } = this;
     const strArr = [account, amount, symbol];
     if (cost || !this.ambiguousPrice) {
@@ -39,7 +39,7 @@ export default class Posting {
       .map(([key, value]) => `    ${key}: "${value}"`)
       .join("\n");
 
-    if (metadata !== "" && showMetaData) {
+    if (metadata !== "") {
       return `  ${strArr.join(" ")}\n${metadata}`.trimRight();
     } else {
       return `  ${strArr.join(" ")}`.trimRight();

@@ -25,7 +25,7 @@ export default class BeanTransaction {
     this.metadata = metadata;
   }
 
-  toString(showMetadata = false) {
+  toString() {
     const { date, flag, payee, narration, postings, metadata } = this;
     const lines = [];
     const firstArr = [date, flag];
@@ -40,10 +40,8 @@ export default class BeanTransaction {
     );
 
     lines.push(firstArr.join(" "));
-    if (showMetadata) {
-      lines.push(...attrsLines);
-    }
-    lines.push(...postings.map((d) => d.toString(showMetadata)));
+    lines.push(...attrsLines);
+    lines.push(...postings.map((d) => d.toString()));
 
     return lines.join("\n");
   }
