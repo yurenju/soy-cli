@@ -4,8 +4,8 @@ import { mock, instance, when, anyString } from "ts-mockito";
 import { Etherscan, EthTx, ERC20Transfer } from "../src/services/Etherscan";
 import { Connection, CryptoConfig } from "../src/config/CryptoConfig";
 import moment = require("moment");
-import Posting from "../src/Posting";
-import BeanTransaction from "../src/BeanTransaction";
+import { Posting } from "../src/models/Posting";
+import { Transaction } from "../src/models/Transaction";
 import BigNumber from "bignumber.js";
 import { patternReplace, postingTransform } from "../src/Common";
 import { PatternType, Rule, Config } from "../src/config/Config";
@@ -75,13 +75,13 @@ describe("CryptoParser", () => {
     it("matched", () => {
       const expected = "0x6344793a588c7b3076bf74562463998b2966ee91";
       const conn = parser.getConnection(expected);
-      expect(conn.address.toLowerCase()).to.eq(expected);
+      expect(conn!.address.toLowerCase()).to.eq(expected);
     });
 
     it("matched with uppercase", () => {
       const expected = "0x6344793A588C7B3076BF74562463998B2966EE91";
       const conn = parser.getConnection(expected);
-      expect(conn.address.toLowerCase()).to.eq(expected.toLowerCase());
+      expect(conn!.address.toLowerCase()).to.eq(expected.toLowerCase());
     });
   });
 
@@ -120,7 +120,9 @@ describe("CryptoParser", () => {
       };
       const balances = await parser.getBalances(tx, tokenMap, conn);
       expect(balances.length).to.eq(1);
-      expect(balances[0]).to.eq(`2020-02-26 balance prefix:SYM 1.234 SYM`);
+      expect(balances[0].toString()).to.eq(
+        `2020-02-26 balance prefix:SYM 1.234 SYM`
+      );
     });
   });
 
@@ -242,8 +244,12 @@ describe("CryptoParser", () => {
 
   describe("patternReplace()", () => {
     it("replace symbol", () => {
-      const d = new Posting("TestAccount:ETH-SYM", "1.23", "ETH-SYM");
-      patternReplace(d, new BeanTransaction(), config.rules);
+      const d = new Posting({
+        account: "TestAccount:ETH-SYM",
+        amount: "1.23",
+        symbol: "ETH-SYM",
+      });
+      patternReplace(d, new Transaction(), config.rules);
       expect(d.symbol).to.eq("SYM");
       expect(d.account).to.eq("TestAccount:SYM");
     });
@@ -251,11 +257,19 @@ describe("CryptoParser", () => {
 
   describe("getDateCoinMap()", () => {
     it("get map with id", () => {
-      const d = new Posting("TestAccount", "12.3", "BAT");
-      const tx = new BeanTransaction("2020-02-25", "*", "", "narration", [d]);
+      const posting = new Posting({
+        account: "TestAccount",
+        amount: "12.3",
+        symbol: "BAT",
+      });
+      const tx = new Transaction({
+        date: moment("2020-02-25"),
+        narration: "narration",
+        postings: [posting],
+      });
       const map = parser.getDateCoinMap([tx]);
       expect(Object.keys(map).length).to.eq(1);
-      expect(map["2020-02-25"]["basic-attention-token"][0]).to.eq(d);
+      expect(map["2020-02-25"]["basic-attention-token"][0]).to.eq(posting);
     });
   });
 

@@ -33,11 +33,11 @@ export interface DefaultAccount {
 }
 
 export class Config {
-  defaultAccount: DefaultAccount;
-  outputDir: string;
-  rules: Rule[];
+  defaultAccount: DefaultAccount = { income: "", expenses: "", pnl: "" };
+  outputDir: string = "";
+  rules: Rule[] = [];
 
-  static parse(file: string): any {
+  static parse(file: string): Record<string, any> {
     const content = readFileSync(file, { encoding: "utf8" });
     return yaml.safeLoad(content);
   }

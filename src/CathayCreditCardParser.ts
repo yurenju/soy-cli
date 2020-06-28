@@ -5,8 +5,8 @@ import * as iconv from "iconv-lite";
 import moment from "moment";
 import { Config } from "./config/Config";
 import { plainToClass } from "class-transformer";
-import BeanTransaction from "./BeanTransaction";
-import Posting from "./Posting";
+import { Transaction } from "./models/Transaction";
+import { Posting } from "./models/Posting";
 import { parseROCDate, patternReplace } from "./Common";
 import { CreditCardBill, CreditCardTransaction } from "./CreditCardBill";
 import Errors from "./Errors";
@@ -156,8 +156,8 @@ export class CathayCreditCardParser {
     const matched = table[1][0].match(
       /帳單結帳日：([\d\/]+)\s*繳款截止日（遇假日順延）：([\d\/]+)\/請儘速繳款/
     );
-    const closingDate = parseROCDate(matched[1]);
-    const paymentDueDate = parseROCDate(matched[2]);
+    const closingDate = matched ? parseROCDate(matched[1]) : moment();
+    const paymentDueDate = matched ? parseROCDate(matched[2]) : moment();
     const currency = getColumn(table, BillColumns.currency);
     const newBalance = Number.parseInt(
       getColumn(table, BillColumns.newBalance)
@@ -185,7 +185,7 @@ export class CathayCreditCardParser {
     return bill;
   }
 
-  fillTxMetadata(beanTx: BeanTransaction, tx: CreditCardTransaction) {
+  fillTxMetadata(beanTx: Transaction, tx: CreditCardTransaction) {
     const fields = [
       "postingDate",
       "country",
@@ -232,17 +232,19 @@ export class CathayCreditCardParser {
   }
 
   getDefaultExpenses(tx: CreditCardTransaction) {
-    const expense = new Posting(
-      this.config.defaultAccount.expenses,
-      tx.amount.toString(),
-      "TWD"
-    );
-    const baseAccount = new Posting(this.config.defaultAccount.base);
+    const expense = new Posting({
+      account: this.config.defaultAccount.expenses,
+      amount: tx.amount.toString(),
+      symbol: "TWD",
+    });
+    const baseAccount = new Posting({
+      account: this.config.defaultAccount.base,
+    });
     return [expense, baseAccount];
   }
 
   async roastBeans(bill: CreditCardBill): Promise<string> {
-    let invoiceService: EInvoiceService;
+    let invoiceService: EInvoiceService | null = null;
 
     const txMetadataFields = [
       "invNum",
@@ -262,11 +264,11 @@ export class CathayCreditCardParser {
       }
 
       invoiceService = new EInvoiceService(
-        process.env.EINVOICE_APP_ID,
-        process.env.EINVOICE_API_KEY,
-        process.env.EINVOICE_UUID,
-        process.env.EINVOICE_CARD_ID,
-        process.env.EINVOICE_CARD_KEY
+        process.env.EINVOICE_APP_ID || "",
+        process.env.EINVOICE_API_KEY || "",
+        process.env.EINVOICE_UUID || "",
+        process.env.EINVOICE_CARD_ID || "",
+        process.env.EINVOICE_CARD_KEY || ""
       );
     }
 
@@ -281,16 +283,16 @@ export class CathayCreditCardParser {
       invoiceMap[key] = invoice;
     });
 
-    const beanTxs: BeanTransaction[] = [];
+    const beanTxs: Transaction[] = [];
 
     for (let i = 0; i < bill.transactions.length; i++) {
       const tx = bill.transactions[i];
       const txDate = tx.transactionDate.format("YYYY-MM-DD");
-      const beanTx = new BeanTransaction(txDate, "*", "", tx.description);
-      const metadata = {
-        source: "credit-card-bill",
-      };
-      beanTx.metadata = metadata;
+      const beanTx = new Transaction({
+        date: tx.transactionDate,
+        narration: tx.description,
+      });
+      beanTx.metadata["source"] = "credit-card-bill";
       this.fillTxMetadata(beanTx, tx);
 
       const key = `${beanTx.date}:${tx.amount}`;
@@ -298,31 +300,33 @@ export class CathayCreditCardParser {
 
       if (invoice) {
         const date = getMoment(invoice.invDate);
-        const detail = await invoiceService.getInvoiceDetail(
+        const detail = await invoiceService?.getInvoiceDetail(
           invoice.invNum,
           date.format("YYYY/MM/DD"),
           invoice.amount
         );
 
-        if (detail.code === 200) {
+        if (detail?.code === 200) {
           beanTx.metadata["source"] = "invoice";
           txMetadataFields.forEach((field) => {
             beanTx.metadata[field] = detail[field];
           });
 
           const postings: Posting[] = detail.details.map((detail) => {
-            const posting = new Posting(
-              this.config.defaultAccount.expenses,
-              detail.amount,
-              "TWD"
-            );
+            const posting = new Posting({
+              account: this.config.defaultAccount.expenses,
+              amount: detail.amount,
+              symbol: "TWD",
+            });
             postingMetadataFields.forEach((field) => {
               posting.metadata[field] = detail[field];
             });
 
             return posting;
           });
-          const baseAccount = new Posting(this.config.defaultAccount.base);
+          const baseAccount = new Posting({
+            account: this.config.defaultAccount.base,
+          });
           beanTx.postings.push(...postings, baseAccount);
         } else {
           const params = [
@@ -348,6 +352,6 @@ export class CathayCreditCardParser {
       )
     );
 
-    return beanTxs.map((tx) => tx.toString(true)).join("\n\n");
+    return beanTxs.map((tx) => tx.toString()).join("\n\n");
   }
 }

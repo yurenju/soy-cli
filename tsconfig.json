@@ -4,7 +4,10 @@
     "sourceMap": true,
     "target": "es2018",
     "outDir": "build",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true,
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts","tests/**/*.ts"],
 }

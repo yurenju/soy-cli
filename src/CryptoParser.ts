@@ -5,12 +5,13 @@ import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import { plainToClass } from "class-transformer";
 import { Config, PatternType } from "./config/Config";
-import Posting from "./Posting";
-import BeanTransaction from "./BeanTransaction";
+import { Posting } from "./models/Posting";
+import { Transaction } from "./models/Transaction";
 import { CryptoConfig, Connection } from "./config/CryptoConfig";
 import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
 import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
 import { postingTransform, patternReplace } from "./Common";
+import { DATE_FORMAT, Balance } from "./models";
 
 dotenv.config();
 
@@ -70,7 +71,7 @@ export class CryptoParser {
     return new BigNumber(value).div(decimals).toFormat();
   }
 
-  getConnection(addr: string): Connection {
+  getConnection(addr: string): Connection | null {
     const { connections: conns } = this.config;
     for (let i = 0; i < conns.length; i++) {
       if (conns[i].address.toLowerCase() === addr.toLowerCase()) {
@@ -93,14 +94,12 @@ export class CryptoParser {
     lastTx: EthTx,
     tokensMetadata: TokenMetadataMap,
     conn: Connection
-  ): Promise<string[]> {
+  ): Promise<Balance[]> {
     const { excludeCoins, rules } = this.config;
     const { blockNumber, timeStamp } = lastTx;
     const { accountPrefix, address } = conn;
-    const balances = [];
-    const date = moment(parseInt(timeStamp) * 1000)
-      .add(1, "day")
-      .format("YYYY-MM-DD");
+    const balances: Balance[] = [];
+    const date = moment(parseInt(timeStamp) * 1000).add(1, "day");
 
     const meta = Object.entries(tokensMetadata);
     for (let j = 0; j < meta.length; j++) {
@@ -116,7 +115,12 @@ export class CryptoParser {
       );
       const balance = this.getValue(result, tokenDecimal);
       const account = `${accountPrefix}:${symbol}`;
-      const data = { date, account, balance, symbol };
+      const data: Record<string, string> = {
+        date: date.format(DATE_FORMAT),
+        account,
+        balance,
+        symbol,
+      };
 
       rules.forEach((rule) =>
         rule.pattern.forEach(({ type, query: field, value }) => {
@@ -129,7 +133,12 @@ export class CryptoParser {
       );
 
       balances.push(
-        `${data.date} balance ${data.account} ${data.balance} ${data.symbol}`
+        new Balance({
+          date,
+          account,
+          amount: balance,
+          symbol,
+        })
       );
     }
 
@@ -201,8 +210,8 @@ export class CryptoParser {
     const fromVal = "-" + toVal;
 
     postings.push(
-      new Posting(fromAccount, fromVal, "ETH"),
-      new Posting(toAccount, toVal, "ETH")
+      new Posting({ account: fromAccount, amount: fromVal, symbol: "ETH" }),
+      new Posting({ account: toAccount, amount: toVal, symbol: "ETH" })
     );
 
     return postings;
@@ -210,7 +219,7 @@ export class CryptoParser {
 
   getInternalPostings(transfers: EthTx[]) {
     const { defaultAccount } = this.config;
-    const postings = [];
+    const postings: Posting[] = [];
     transfers.forEach((transfer) => {
       const { from, to, value } = transfer;
 
@@ -231,10 +240,18 @@ export class CryptoParser {
 
       const amount = this.getValue(value, "18");
       if ((fromConn || transfers.length <= 1) && value !== "0") {
-        postings.push(new Posting(fromAccount, `-${amount}`, "ETH"));
+        postings.push(
+          new Posting({
+            account: fromAccount,
+            amount: `-${amount}`,
+            symbol: "ETH",
+          })
+        );
       }
       if ((toConn || transfers.length <= 1) && value !== "0") {
-        postings.push(new Posting(toAccount, amount, "ETH"));
+        postings.push(
+          new Posting({ account: toAccount, amount, symbol: "ETH" })
+        );
       }
     });
 
@@ -243,7 +260,7 @@ export class CryptoParser {
 
   getERC20Postings(transfers: ERC20Transfer[]) {
     const { defaultAccount, excludeCoins } = this.config;
-    const postings = [];
+    const postings: Posting[] = [];
     transfers.forEach((transfer) => {
       const { from, to, tokenSymbol, tokenDecimal, value } = transfer;
 
@@ -277,13 +294,21 @@ export class CryptoParser {
       //   Assets:Crypto:Wallet:CSAI 100 CSAI
       const amount = this.getValue(value, tokenDecimal);
       if ((fromConn || transfers.length <= 1) && value !== "0") {
-        const pos = new Posting(fromAccount, `-${amount}`, tokenSymbol);
+        const pos = new Posting({
+          account: fromAccount,
+          amount: `-${amount}`,
+          symbol: tokenSymbol,
+        });
         pos.ambiguousPrice = false;
         pos.metadata.address = from;
         postings.push(pos);
       }
       if ((toConn || transfers.length <= 1) && value !== "0") {
-        const pos = new Posting(toAccount, amount, tokenSymbol);
+        const pos = new Posting({
+          account: toAccount,
+          amount,
+          symbol: tokenSymbol,
+        });
         pos.metadata.address = to;
         postings.push(pos);
       }
@@ -292,15 +317,16 @@ export class CryptoParser {
     return postings;
   }
 
-  getDateCoinMap(beans: BeanTransaction[]): DateCoinMap {
+  getDateCoinMap(beans: Transaction[]): DateCoinMap {
     const map: DateCoinMap = {};
 
     beans.forEach((bean) => {
-      if (!map[bean.date]) {
-        map[bean.date] = {};
+      const dateStr = bean.date.format(DATE_FORMAT);
+      if (!map[dateStr]) {
+        map[dateStr] = {};
       }
 
-      const coinsMap = map[bean.date];
+      const coinsMap = map[dateStr];
 
       bean.postings.forEach((d) => {
         const coin = this.config.coins.find((c) => c.symbol === d.symbol);
@@ -318,7 +344,7 @@ export class CryptoParser {
     return map;
   }
 
-  async fillPrices(beans: BeanTransaction[]) {
+  async fillPrices(beans: Transaction[]) {
     const { fiat } = this.config;
     const map = this.getDateCoinMap(beans);
     const tasks: Promise<HistoryPrice>[] = [];
@@ -343,9 +369,12 @@ export class CryptoParser {
           return;
         }
         if (posting.amount[0] !== "-" || posting.account.match(/^Income:/)) {
-          posting.cost = `${
-            result.market_data.current_price[fiat.toLowerCase()]
-          } ${fiat}`;
+          posting.cost = {
+            amount: result.market_data.current_price[
+              fiat.toLowerCase()
+            ].toString(),
+            symbol: fiat,
+          };
         }
       });
     });
@@ -382,7 +411,7 @@ export class CryptoParser {
     } = tx;
     const { defaultAccount, rules } = this.config;
 
-    const date = moment(parseInt(timeStamp) * 1000).format("YYYY-MM-DD");
+    const date = moment(parseInt(timeStamp) * 1000);
 
     const gas = new BigNumber(gasUsed)
       .multipliedBy(gasPrice)
@@ -392,7 +421,7 @@ export class CryptoParser {
     const val = new BigNumber(value).div(decimals).toString();
 
     const narration = this.getNarration(tx);
-    const beanTx = new BeanTransaction(date, "*", "", narration);
+    const beanTx = new Transaction({ date, narration });
     const { postings: postings, metadata } = beanTx;
     metadata.tx = hash;
     metadata.from = from;
@@ -402,12 +431,16 @@ export class CryptoParser {
 
     // Gas
     if (fromConn) {
-      const gasExpense = new Posting(defaultAccount.ethTx, gas, "ETH");
-      const ethAccount = new Posting(
-        `${fromConn.accountPrefix}:ETH`,
-        `-${gas}`,
-        "ETH"
-      );
+      const gasExpense = new Posting({
+        account: defaultAccount.ethTx,
+        amount: gas,
+        symbol: "ETH",
+      });
+      const ethAccount = new Posting({
+        account: `${fromConn.accountPrefix}:ETH`,
+        amount: `-${gas}`,
+        symbol: "ETH",
+      });
       ethAccount.ambiguousPrice = false;
       postings.push(gasExpense, ethAccount);
     }
@@ -426,14 +459,14 @@ export class CryptoParser {
     beanTx.postings.forEach((posting) =>
       patternReplace(posting, beanTx, rules)
     );
-    const pnl = new Posting(defaultAccount.pnl);
+    const pnl = new Posting({ account: defaultAccount.pnl });
     beanTx.postings.push(pnl);
     return beanTx;
   }
 
   async roastBean(): Promise<string> {
     const { connections } = this.config;
-    const beanTxs: BeanTransaction[] = [];
+    const beanTxs: Transaction[] = [];
     const ethTxnMap: EthTxMap = {};
     const balances = [];
     for (let i = 0; i < connections.length; i++) {
@@ -450,7 +483,7 @@ export class CryptoParser {
         );
 
         // convert to map
-        txListRes.result.forEach((tx) => {
+        txListRes.result.forEach((tx: any) => {
           if (!ethTxnMap[tx.hash]) {
             ethTxnMap[tx.hash] = tx;
             tx.transfers = [];
@@ -484,11 +517,9 @@ export class CryptoParser {
     beanTxs.push(...txList.map((tx) => this.toBeanTx(tx)));
 
     await this.fillPrices(beanTxs);
-    return (
-      beanTxs.map((t) => t.toString()).join("\n\n") +
-      "\n\n" +
-      balances.join("\n")
-    );
+    const directives = [...beanTxs, ...balances];
+
+    return directives.map((dir) => dir.toString()).join("\n\n");
   }
 
   async parse() {

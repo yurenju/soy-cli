@@ -1,10 +1,7 @@
-import { readFileSync } from "fs";
-import * as iconv from "iconv-lite";
-import parse from "csv-parse/lib/sync";
 import moment, { Moment } from "moment";
-import ptr from "json-ptr";
-import Posting from "./Posting";
-import BeanTransaction from "./BeanTransaction";
+import ptr from "jsonpointer";
+import { Posting } from "./models/Posting";
+import { Transaction } from "./models/Transaction";
 import { Rule, PatternType } from "./config/Config";
 
 export enum TxType {
@@ -30,9 +27,15 @@ export function postingTransform(
   ptr.set(data, query, value);
 }
 
+export function copyValues(from: any, to: any) {
+  Object.entries(from).forEach(([key, value]) => {
+    to[key] = value;
+  });
+}
+
 export function patternReplace(
   posting: Posting,
-  tx: BeanTransaction,
+  tx: Transaction,
   rules: Rule[]
 ) {
   rules.forEach(({ pattern, transform }) => {

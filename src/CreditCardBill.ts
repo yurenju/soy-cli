@@ -12,6 +12,7 @@ export interface CreditCardBill {
 }
 
 export interface CreditCardTransaction {
+  [key: string]: any;
   transactionDate: Moment; //消費日
   postingDate: Moment; // 入帳起息日
   description: string; // 交易說明
