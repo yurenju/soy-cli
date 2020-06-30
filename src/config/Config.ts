@@ -1,5 +1,7 @@
+import "reflect-metadata";
 import { readFileSync } from "fs";
 import * as yaml from "js-yaml";
+import { f } from "@marcj/marshal";
 
 export enum PatternType {
   Posting = "posting",
@@ -7,35 +9,35 @@ export enum PatternType {
   Balance = "balance",
 }
 
-export interface Pattern {
-  type: PatternType;
-  query: string;
-  value: string;
+export class Pattern {
+  @f.enum(PatternType) type: PatternType = PatternType.Posting;
+  @f query: string = "";
+  @f value: string = "";
 }
 
-export interface Transform {
-  type: PatternType;
-  query: string;
-  value: string;
+export class Transform {
+  @f.enum(PatternType) type: PatternType = PatternType.Posting;
+  @f query: string = "";
+  @f value: string = "";
 }
 
-export interface Rule {
-  pattern: Pattern[];
-  transform: Transform[];
+export class Rule {
+  @f.array(Pattern) pattern: Pattern[] = [];
+  @f.array(Transform) transform: Transform[] = [];
 }
 
-export interface DefaultAccount {
-  income: string;
-  expenses: string;
-  pnl: string;
-  base?: string;
-  ethTx?: string;
+export class DefaultAccount {
+  @f income: string = "";
+  @f expenses: string = "";
+  @f pnl: string = "";
+  @f base?: string;
+  @f ethTx?: string;
 }
 
 export class Config {
-  defaultAccount: DefaultAccount = { income: "", expenses: "", pnl: "" };
-  outputDir: string = "";
-  rules: Rule[] = [];
+  @f defaultAccount: DefaultAccount = new DefaultAccount();
+  @f outputDir: string = "";
+  @f.array(Rule) rules: Rule[] = [];
 
   static parse(file: string): Record<string, any> {
     const content = readFileSync(file, { encoding: "utf8" });

@@ -4,7 +4,7 @@ import path, { basename } from "path";
 import * as iconv from "iconv-lite";
 import moment from "moment";
 import { Config } from "./config/Config";
-import { plainToClass } from "class-transformer";
+import { plainToClass } from "@marcj/marshal";
 import { Transaction } from "./models/Transaction";
 import { Posting } from "./models/Posting";
 import { parseROCDate, patternReplace } from "./Common";

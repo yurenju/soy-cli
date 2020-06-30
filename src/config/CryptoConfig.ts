@@ -1,20 +1,25 @@
 import { Config } from "./Config";
+import { f } from "@marcj/marshal";
 
-export interface Connection {
-  type: string;
-  address: string;
-  accountPrefix: string;
+export class Connection {
+  @f type: string = "";
+  @f address: string = "";
+  @f accountPrefix: string = "";
 }
 
-export interface Coin {
-  symbol: string;
-  id: string;
+export class Coin {
+  @f symbol: string = "";
+  @f id: string = "";
+}
+
+export class Timestamp {
+  @f ethereum: string = "";
 }
 
 export class CryptoConfig extends Config {
-  connections: Connection[] = [];
-  excludeCoins: string[] = [];
-  timestamp: { ethereum: string } = { ethereum: "" };
-  coins: Coin[] = [];
-  fiat: string = "TWD";
+  @f.array(Connection) connections: Connection[] = [];
+  @f.array(String) excludeCoins: string[] = [];
+  @f timestamp: Timestamp = new Timestamp();
+  @f.array(Coin) coins: Coin[] = [];
+  @f fiat: string = "TWD";
 }

@@ -3,7 +3,7 @@ import moment from "moment";
 import BigNumber from "bignumber.js";
 import { ShellString, mkdir } from "shelljs";
 import path from "path";
-import { plainToClass } from "class-transformer";
+import { plainToClass } from "@marcj/marshal";
 import { Config, PatternType } from "./config/Config";
 import { Posting } from "./models/Posting";
 import { Transaction } from "./models/Transaction";

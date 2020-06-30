@@ -1,6 +1,7 @@
 import { Config } from "./Config";
+import { f } from "@marcj/marshal";
 
 export default class CathayBankConfig extends Config {
-  inputFile: string = "";
-  encoding: string = "utf8";
+  @f inputFile: string = "";
+  @f encoding: string = "utf8";
 }

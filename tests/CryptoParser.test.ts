@@ -1,4 +1,5 @@
 import { CryptoParser, TokenMetadataMap } from "../src/CryptoParser";
+import "reflect-metadata";
 import { expect } from "chai";
 import { mock, instance, when, anyString } from "ts-mockito";
 import { Etherscan, EthTx, ERC20Transfer } from "../src/services/Etherscan";
@@ -9,7 +10,7 @@ import { Transaction } from "../src/models/Transaction";
 import BigNumber from "bignumber.js";
 import { patternReplace, postingTransform } from "../src/Common";
 import { PatternType, Rule, Config } from "../src/config/Config";
-import { plainToClass } from "class-transformer";
+import { plainToClass } from "@marcj/marshal";
 
 function createEthTx(timeStamp = ""): EthTx {
   return {

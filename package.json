@@ -43,7 +43,6 @@
     "@types/shelljs": "0.8.8",
     "bignumber.js": "9.0.0",
     "bottleneck": "2.19.5",
-    "class-transformer": "0.2.3",
     "commander": "4.1.0",
     "csv-parse": "^4.8.3",
     "dotenv": "8.2.0",

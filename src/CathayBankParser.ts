@@ -6,7 +6,7 @@ import parse from "csv-parse/lib/sync";
 import moment from "moment";
 import { Config } from "./config/Config";
 import CathayBankConfig from "./config/CathayBankConfig";
-import { plainToClass } from "class-transformer";
+import { plainToClass } from "@marcj/marshal";
 import { Transaction } from "./models/Transaction";
 import { Posting } from "./models/Posting";
 import { TxType, patternReplace } from "./Common";
