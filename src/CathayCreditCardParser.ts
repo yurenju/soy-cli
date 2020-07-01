@@ -295,7 +295,7 @@ export class CathayCreditCardParser {
       beanTx.metadata["source"] = "credit-card-bill";
       this.fillTxMetadata(beanTx, tx);
 
-      const key = `${beanTx.date}:${tx.amount}`;
+      const key = `${txDate}:${tx.amount}`;
       const invoice = invoiceMap[key];
 
       if (invoice) {
@@ -319,7 +319,7 @@ export class CathayCreditCardParser {
               symbol: "TWD",
             });
             postingMetadataFields.forEach((field) => {
-              posting.metadata[field] = detail[field];
+              posting.metadata[field] = detail[field].replace(/"/g, "");
             });
 
             return posting;

@@ -134,6 +134,7 @@ export class CathayBankParser {
       const balance = new Balance({
         account: baseAccount,
         amount: last["餘額"],
+        symbol: "TWD",
         date: moment(last["日期"], "YYYYMMDD").add(1, "day"),
       });
       directives.push(balance);
