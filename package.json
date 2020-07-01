@@ -13,14 +13,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yurenju/accounting-utils.git"
+    "url": "git+https://github.com/yurenju/soy-cli.git"
   },
   "author": "Yuren Ju <yurenju@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yurenju/accounting-utils/issues"
+    "url": "https://github.com/yurenju/soy-cli/issues"
   },
-  "homepage": "https://github.com/yurenju/accounting-utils#readme",
+  "homepage": "https://github.com/yurenju/soy-cli",
   "devDependencies": {
     "@types/chai": "4.2.9",
     "@types/joi": "14.3.4",
