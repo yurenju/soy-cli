@@ -5,7 +5,7 @@ import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import { plainToClass } from "@marcj/marshal";
 import { Config, PatternType } from "./config/Config";
-import { Posting } from "./models/Posting";
+import { Posting, Cost } from "./models/Posting";
 import { Transaction } from "./models/Transaction";
 import { CryptoConfig, Connection } from "./config/CryptoConfig";
 import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
@@ -298,8 +298,8 @@ export class CryptoParser {
           account: fromAccount,
           amount: `-${amount}`,
           symbol: tokenSymbol,
+          cost: new Cost({ ambiguous: true }),
         });
-        pos.ambiguousPrice = false;
         pos.metadata.address = from;
         postings.push(pos);
       }
@@ -369,12 +369,14 @@ export class CryptoParser {
           return;
         }
         if (posting.amount[0] !== "-" || posting.account.match(/^Income:/)) {
-          posting.cost = {
+          posting.cost = new Cost({
             amount: result.market_data.current_price[
               fiat.toLowerCase()
             ].toString(),
             symbol: fiat,
-          };
+          });
+        } else {
+          posting.cost = new Cost({ ambiguous: true });
         }
       });
     });
@@ -422,7 +424,7 @@ export class CryptoParser {
 
     const narration = this.getNarration(tx);
     const beanTx = new Transaction({ date, narration });
-    const { postings: postings, metadata } = beanTx;
+    const { postings, metadata } = beanTx;
     metadata.tx = hash;
     metadata.from = from;
     metadata.to = to;
@@ -440,8 +442,8 @@ export class CryptoParser {
         account: `${fromConn.accountPrefix}:ETH`,
         amount: `-${gas}`,
         symbol: "ETH",
+        cost: new Cost({ ambiguous: true }),
       });
-      ethAccount.ambiguousPrice = false;
       postings.push(gasExpense, ethAccount);
     }
 

@@ -9,8 +9,15 @@ enum PriceType {
 }
 
 export class Cost {
+  @f ambiguous: boolean = false;
   @f amount: string = "";
   @f symbol: string = DEFAULT_SYMBOL;
+
+  constructor(cost: Partial<Cost>) {
+    if (cost) {
+      copyValues(cost, this);
+    }
+  }
 }
 
 export class Price {
@@ -44,7 +51,11 @@ export class Posting {
       major += ` ${amount} ${symbol}`;
 
       if (cost) {
-        major += ` {${cost.amount} ${cost.symbol}}`;
+        if (cost.ambiguous) {
+          major += " {}";
+        } else {
+          major += ` {${cost.amount} ${cost.symbol}}`;
+        }
       }
 
       // add "@ 200 USD" or "@@ 200 USD" depends on type
