@@ -5,13 +5,18 @@ import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import { plainToClass } from "@marcj/marshal";
 import { Config, PatternType } from "./config/Config";
-import { Posting, Cost } from "./models/Posting";
+import { Posting, Cost, PostingPrice } from "./models/Posting";
 import { Transaction } from "./models/Transaction";
 import { CryptoConfig, Connection } from "./config/CryptoConfig";
 import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
 import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
-import { postingTransform, patternReplace } from "./Common";
+import {
+  postingTransform,
+  patternReplace,
+  getAmountFromHistoryPrice,
+} from "./Common";
 import { DATE_FORMAT, Balance } from "./models";
+import { Price } from "./models/Price";
 
 dotenv.config();
 
@@ -344,6 +349,24 @@ export class CryptoParser {
     return map;
   }
 
+  async getLatestPrices(): Promise<Price[]> {
+    const { fiat } = this.config;
+    const today = moment().format(DATE_FORMAT);
+    const coinGeckoPrices = await Promise.all(
+      this.config.coins.map((coin) =>
+        this.coingecko.getHistoryPrice(today, coin.id)
+      )
+    );
+    return coinGeckoPrices.map((p, i) => {
+      const { symbol: holding } = this.config.coins[i];
+      return new Price({
+        holding,
+        amount: getAmountFromHistoryPrice(p, fiat),
+        symbol: fiat,
+      });
+    });
+  }
+
   async fillPrices(beans: Transaction[]) {
     const { fiat } = this.config;
     const map = this.getDateCoinMap(beans);
@@ -370,9 +393,7 @@ export class CryptoParser {
         }
         if (posting.amount[0] !== "-" || posting.account.match(/^Income:/)) {
           posting.cost = new Cost({
-            amount: result.market_data.current_price[
-              fiat.toLowerCase()
-            ].toString(),
+            amount: getAmountFromHistoryPrice(result, fiat),
             symbol: fiat,
           });
         } else {
@@ -519,7 +540,8 @@ export class CryptoParser {
     beanTxs.push(...txList.map((tx) => this.toBeanTx(tx)));
 
     await this.fillPrices(beanTxs);
-    const directives = [...beanTxs, ...balances];
+    const prices = await this.getLatestPrices();
+    const directives = [...beanTxs, ...balances, ...prices];
 
     return directives.map((dir) => dir.toString()).join("\n\n");
   }

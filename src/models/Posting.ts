@@ -20,7 +20,7 @@ export class Cost {
   }
 }
 
-export class Price {
+export class PostingPrice {
   @f type: PriceType = PriceType.Unit;
   @f amount: string = "";
   @f symbol: string = DEFAULT_SYMBOL;
@@ -34,7 +34,7 @@ export class Posting {
   @f symbol: string = DEFAULT_SYMBOL;
   @f.map(String) metadata: Record<string, string> = {};
   @f.optional() cost?: Cost;
-  @f.optional() price?: Price;
+  @f.optional() price?: PostingPrice;
 
   constructor(posting?: Partial<Posting>) {
     if (posting) {

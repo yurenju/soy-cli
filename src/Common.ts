@@ -3,6 +3,7 @@ import ptr from "jsonpointer";
 import { Posting } from "./models/Posting";
 import { Transaction } from "./models/Transaction";
 import { Rule, PatternType } from "./config/Config";
+import { HistoryPrice } from "./services/CoinGecko";
 
 export enum TxType {
   Deposit = "deposit",
@@ -64,4 +65,16 @@ export function patternReplace(
       });
     }
   });
+}
+
+export function getAmountFromHistoryPrice(
+  price: HistoryPrice,
+  fiat: string
+): string {
+  try {
+    return price.market_data.current_price[fiat.toLowerCase()].toString();
+  } catch (e) {
+    console.error("coin id not found", price);
+    return "0";
+  }
 }
