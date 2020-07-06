@@ -416,12 +416,45 @@ export class CryptoParser {
       if (tx.value === "0") {
         narration = "Contract Execution";
       } else {
-        narration = "ETH Transfer";
+        const action = this.getConnection(tx.from) ? "Sent" : "Received";
+        const amount = new BigNumber(tx.value)
+          .div(new BigNumber(10).pow(18))
+          .toFixed(3);
+        narration = `${action} ${amount} ETH`;
       }
     } else if (tx.erc20Transfers.length <= 1) {
-      narration = "ERC20 Transfer";
+      const transfer = tx.erc20Transfers[0];
+      const action = this.getConnection(transfer.from) ? "Sent" : "Received";
+      const amount = new BigNumber(transfer.value).div(
+        new BigNumber(10).pow(transfer.tokenDecimal)
+      );
+      narration = `${action} ${amount} ${transfer.tokenSymbol}`;
     } else {
-      narration = "ERC20 Exchange";
+      const from: string[] = [];
+      const to: string[] = [];
+
+      const ethAmount = new BigNumber(tx.value).div(new BigNumber(10).pow(18));
+      if (this.getConnection(tx.from) && ethAmount.gt(0)) {
+        from.push(`${ethAmount.toFixed(3)} ETH`);
+      }
+      if (this.getConnection(tx.to) && ethAmount.gt(0)) {
+        to.push(`${ethAmount.toFixed(3)} ETH`);
+      }
+
+      tx.erc20Transfers.forEach((transfer) => {
+        const erc20Amount = new BigNumber(transfer.value).div(
+          new BigNumber(10).pow(transfer.tokenDecimal)
+        );
+
+        if (this.getConnection(transfer.from) && erc20Amount.gt(0)) {
+          from.push(`${erc20Amount.toFixed(3)} ${transfer.tokenSymbol}`);
+        }
+        if (this.getConnection(transfer.to) && erc20Amount.gt(0)) {
+          to.push(`${erc20Amount.toFixed(3)} ${transfer.tokenSymbol}`);
+        }
+      });
+      // Exchange [3.0 ETH] -> [40 BAT]
+      narration = `Exchange ${from} to ${to}`;
     }
 
     return narration;

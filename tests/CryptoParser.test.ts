@@ -344,21 +344,21 @@ describe("CryptoParser", () => {
       const tx = createEthTx();
       tx.erc20Transfers.push(createTransfer(), createTransfer());
       const narration = parser.getNarration(tx);
-      expect(narration).to.eq("ERC20 Exchange");
+      expect(narration).to.contain("Exchange");
     });
 
     it("get ERC20 transfer narration if transfers is 1", () => {
       const tx = createEthTx();
       tx.erc20Transfers.push(createTransfer());
       const narration = parser.getNarration(tx);
-      expect(narration).to.eq("ERC20 Transfer");
+      expect(narration).to.contain("Received");
     });
 
     it("get ETH transfer if no transfer and value is not zero", () => {
       const tx = createEthTx();
       tx.value = "20";
       const narration = parser.getNarration(tx);
-      expect(narration).to.eq("ETH Transfer");
+      expect(narration).to.contain("Received");
     });
 
     it("get Contract Execution if value is not zero", () => {
