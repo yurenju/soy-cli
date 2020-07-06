@@ -46,6 +46,7 @@
     "commander": "4.1.0",
     "csv-parse": "^4.8.3",
     "dotenv": "8.2.0",
+    "ethers": "5.0.4",
     "iconv-lite": "^0.5.0",
     "js-yaml": "3.13.1",
     "json-ptr": "1.2.0",
