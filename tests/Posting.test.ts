@@ -1,4 +1,4 @@
-import { Posting } from "../src/models/Posting";
+import { Posting, Cost } from "../src/models/Posting";
 import { expect } from "chai";
 
 describe("Posting", () => {
@@ -17,7 +17,7 @@ describe("Posting", () => {
         account: "TestAccount",
         amount: "30.0",
         symbol: "USD",
-        cost: { amount: "30", symbol: "TWD" },
+        cost: new Cost({ amount: "30", symbol: "TWD" }),
       }).toString();
       expect(posting).to.eq("  TestAccount 30.0 USD {30 TWD}");
     });

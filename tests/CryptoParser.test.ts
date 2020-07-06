@@ -2,7 +2,7 @@ import { CryptoParser, TokenMetadataMap } from "../src/CryptoParser";
 import "reflect-metadata";
 import { expect } from "chai";
 import { mock, instance, when, anyString } from "ts-mockito";
-import { Etherscan, EthTx, ERC20Transfer } from "../src/services/Etherscan";
+import { Etherscan, EthTx, Erc20Transfer } from "../src/services/Etherscan";
 import { Connection, CryptoConfig } from "../src/config/CryptoConfig";
 import moment = require("moment");
 import { Posting } from "../src/models/Posting";
@@ -14,16 +14,26 @@ import { plainToClass } from "@marcj/marshal";
 
 function createEthTx(timeStamp = ""): EthTx {
   return {
-    hash: "",
-    transfers: [],
-    internalTransfers: [],
-    value: "",
-    timeStamp,
-    blockNumber: "",
     from: "",
     to: "",
+    blockNumber: "",
     gasUsed: "",
     gasPrice: "",
+    hash: "",
+    value: "",
+    timeStamp: timeStamp,
+    blockHash: "0",
+    erc20Transfers: [],
+    internalTransfers: [],
+    isError: "0",
+    txreceipt_status: "",
+    confirmations: "0",
+    contractAddress: "",
+    cumulativeGasUsed: "",
+    gas: "",
+    input: "",
+    nonce: "",
+    transactionIndex: "",
   };
 }
 
@@ -31,7 +41,7 @@ function createTransfer(
   value = "0",
   tokenDecimal = "3",
   tokenSymbol = "SYM"
-): ERC20Transfer {
+): Erc20Transfer {
   return {
     from: "",
     to: "",
@@ -41,6 +51,17 @@ function createTransfer(
     timeStamp: "0",
     hash: "",
     contractAddress: "",
+    blockHash: "",
+    tokenName: "",
+    blockNumber: "",
+    confirmations: "",
+    cumulativeGasUsed: "",
+    gas: "",
+    gasPrice: "",
+    gasUsed: "",
+    input: "",
+    nonce: "",
+    transactionIndex: "",
   };
 }
 
@@ -161,7 +182,7 @@ describe("CryptoParser", () => {
 
   describe("getERC20Postings()", () => {
     it("single transfer from our own address", () => {
-      const transfers: ERC20Transfer[] = [
+      const transfers: Erc20Transfer[] = [
         {
           from: "0x6344793a588c7b3076bf74562463998b2966ee91",
           to: "unknown-to-address",
@@ -171,6 +192,17 @@ describe("CryptoParser", () => {
           timeStamp: "0",
           hash: "hash",
           contractAddress: "contract-address",
+          blockHash: "",
+          tokenName: "",
+          blockNumber: "",
+          confirmations: "",
+          cumulativeGasUsed: "",
+          gas: "",
+          gasPrice: "",
+          gasUsed: "",
+          input: "",
+          nonce: "",
+          transactionIndex: "",
         },
       ];
 
@@ -185,7 +217,7 @@ describe("CryptoParser", () => {
     });
 
     it("single transfer to our own address", () => {
-      const transfers: ERC20Transfer[] = [
+      const transfers: Erc20Transfer[] = [
         {
           from: "unknown-from-address",
           to: "0x6344793a588c7b3076bf74562463998b2966ee91",
@@ -195,6 +227,17 @@ describe("CryptoParser", () => {
           timeStamp: "0",
           hash: "hash",
           contractAddress: "contract-address",
+          blockHash: "",
+          tokenName: "",
+          blockNumber: "",
+          confirmations: "",
+          cumulativeGasUsed: "",
+          gas: "",
+          gasPrice: "",
+          gasUsed: "",
+          input: "",
+          nonce: "",
+          transactionIndex: "",
         },
       ];
 
@@ -209,7 +252,7 @@ describe("CryptoParser", () => {
     });
 
     it("merge transactions", () => {
-      const transfers: ERC20Transfer[] = [
+      const transfers: Erc20Transfer[] = [
         {
           from: "0x6344793a588c7b3076bf74562463998b2966ee91",
           to: "somewhere",
@@ -219,6 +262,17 @@ describe("CryptoParser", () => {
           timeStamp: "0",
           hash: "hash",
           contractAddress: "contract-address",
+          blockHash: "",
+          tokenName: "",
+          blockNumber: "",
+          confirmations: "",
+          cumulativeGasUsed: "",
+          gas: "",
+          gasPrice: "",
+          gasUsed: "",
+          input: "",
+          nonce: "",
+          transactionIndex: "",
         },
         {
           from: "somewhere",
@@ -229,6 +283,17 @@ describe("CryptoParser", () => {
           timeStamp: "0",
           hash: "hash",
           contractAddress: "contract-address",
+          blockHash: "",
+          tokenName: "",
+          blockNumber: "",
+          confirmations: "",
+          cumulativeGasUsed: "",
+          gas: "",
+          gasPrice: "",
+          gasUsed: "",
+          input: "",
+          nonce: "",
+          transactionIndex: "",
         },
       ];
 
@@ -277,14 +342,14 @@ describe("CryptoParser", () => {
   describe("getNarration()", () => {
     it("get Exchange narration if transfers great than 1", () => {
       const tx = createEthTx();
-      tx.transfers.push(createTransfer(), createTransfer());
+      tx.erc20Transfers.push(createTransfer(), createTransfer());
       const narration = parser.getNarration(tx);
       expect(narration).to.eq("ERC20 Exchange");
     });
 
     it("get ERC20 transfer narration if transfers is 1", () => {
       const tx = createEthTx();
-      tx.transfers.push(createTransfer());
+      tx.erc20Transfers.push(createTransfer());
       const narration = parser.getNarration(tx);
       expect(narration).to.eq("ERC20 Transfer");
     });

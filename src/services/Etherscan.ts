@@ -4,28 +4,100 @@ import fetch from "node-fetch";
 
 const ETHERSCAN_BASE_URL = "https://api.etherscan.io/api";
 
-export interface ERC20Transfer {
-  from: string;
-  to: string;
-  tokenSymbol: string;
-  tokenDecimal: string;
-  value: string;
-  timeStamp: string;
-  hash: string;
+export interface EtherscanBaseTx {
+  blockNumber: string;
+  confirmations: string;
   contractAddress: string;
+  cumulativeGasUsed: string;
+  from: string;
+  gas: string;
+  gasPrice: string;
+  gasUsed: string;
+  hash: string;
+  input: string;
+  nonce: string;
+  timeStamp: string;
+  to: string;
+  value: string;
+  transactionIndex: string;
 }
 
-export interface EthTx {
-  hash: string;
-  transfers: ERC20Transfer[];
-  internalTransfers: EthTx[];
-  value: string;
-  timeStamp: string;
+export interface EthTx extends EtherscanBaseTx {
+  blockHash: string;
+  isError: string;
+  txreceipt_status: string;
+  erc20Transfers: Erc20Transfer[];
+  internalTransfers: InternalTx[];
+}
+
+export interface Erc20Transfer extends EtherscanBaseTx {
+  blockHash: string;
+  tokenDecimal: string;
+  tokenName: string;
+  tokenSymbol: string;
+}
+
+export interface InternalTx extends EtherscanBaseTx {
+  errCode: string;
+  isError: string;
+  traceId: string;
+  type: string;
+}
+
+export interface EtherscanResponse<T> {
+  message: string;
+  status: string;
+  result: T;
+}
+
+export interface RpcResponse<T> {
+  jsonrpc: string;
+  id: number;
+  result: T;
+}
+
+export interface RpcTx {
+  blockHash: string;
   blockNumber: string;
   from: string;
-  to: string;
-  gasUsed: string;
+  gas: string;
   gasPrice: string;
+  hash: string;
+  input: string;
+  nonce: string;
+  to: string;
+  transactionIndex: string;
+  value: string;
+  v: string;
+  r: string;
+  s: string;
+}
+
+export interface RpcLog {
+  address: string;
+  topics: string[];
+  data: string;
+  blockNumber: string;
+  transactionHash: string;
+  transactionIndex: string;
+  blockHash: string;
+  logIndex: string;
+  removed: boolean;
+}
+
+export interface RpcReceipt {
+  blockHash: string;
+  blockNumber: string;
+  contractAddress: string;
+  cumulativeGasUsed: string;
+  from: string;
+  gasUsed: string;
+  logs: RpcLog[];
+  logsBloom: string;
+  status: string;
+  to: string;
+  transactionHash: string;
+  transactionIndex: string;
 }
 
 export class Etherscan {
@@ -39,7 +111,7 @@ export class Etherscan {
   ) {
     this.limit = new Bottleneck({
       maxConcurrent,
-      minTime
+      minTime,
     });
   }
 
@@ -48,7 +120,7 @@ export class Etherscan {
       module: "proxy",
       action: "eth_getTransactionByHash",
       txhash: hash,
-      apikey: this.apiKey
+      apikey: this.apiKey,
     }).toString();
   }
 
@@ -57,7 +129,7 @@ export class Etherscan {
       module: "proxy",
       action: "eth_getTransactionReceipt",
       txhash: hash,
-      apikey: this.apiKey
+      apikey: this.apiKey,
     }).toString();
   }
 
@@ -72,7 +144,7 @@ export class Etherscan {
       contractaddress,
       address,
       tag,
-      apikey: this.apiKey
+      apikey: this.apiKey,
     }).toString();
   }
 
@@ -81,7 +153,7 @@ export class Etherscan {
       module: "account",
       action: "txlist",
       address,
-      apikey: this.apiKey
+      apikey: this.apiKey,
     }).toString();
   }
 
@@ -90,7 +162,7 @@ export class Etherscan {
       module: "account",
       action: "txlistinternal",
       address,
-      apikey: this.apiKey
+      apikey: this.apiKey,
     }).toString();
   }
 
@@ -99,7 +171,7 @@ export class Etherscan {
       module: "account",
       action: "tokentx",
       address,
-      apikey: this.apiKey
+      apikey: this.apiKey,
     }).toString();
   }
 
@@ -107,25 +179,41 @@ export class Etherscan {
     console.log(`    getting tx ${hash}`);
     const txParams = this.getTxParams(hash);
     const receiptParams = this.getReceiptParams(hash);
-    const txurl = `${this.baseUrl}?${txParams}`;
-    const receipturl = `${this.baseUrl}?${receiptParams}`;
-    const { result: txResult } = await this.limit.schedule(() =>
-      fetch(txurl).then(res => res.json())
+    const txUrl = `${this.baseUrl}?${txParams}`;
+    const receiptUrl = `${this.baseUrl}?${receiptParams}`;
+    const {
+      result: txResult,
+    }: RpcResponse<RpcTx> = await this.limit.schedule(() =>
+      fetch(txUrl).then((res) => res.json())
     );
-    const { result: receiptResult } = await this.limit.schedule(() =>
-      fetch(receipturl).then(res => res.json())
+
+    const {
+      result: receiptResult,
+    }: RpcResponse<RpcReceipt> = await this.limit.schedule(() =>
+      fetch(receiptUrl).then((res) => res.json())
     );
+
     return {
       from: txResult.from,
       to: txResult.to,
       blockNumber: new BigNumber(receiptResult.blockNumber).toString(),
       gasUsed: new BigNumber(receiptResult.gasUsed).toString(),
-      gasPrice: new BigNumber(txResult.getPrice).toString(),
+      gasPrice: new BigNumber(txResult.gasPrice).toString(),
       hash: txResult.hash,
       value: new BigNumber(txResult.value).toString(),
       timeStamp: "",
-      transfers: [],
-      internalTransfers: []
+      blockHash: txResult.blockHash,
+      erc20Transfers: [],
+      internalTransfers: [],
+      isError: "0",
+      txreceipt_status: receiptResult.status,
+      confirmations: "0",
+      contractAddress: receiptResult.contractAddress,
+      cumulativeGasUsed: receiptResult.cumulativeGasUsed,
+      gas: txResult.gas,
+      input: txResult.input,
+      nonce: txResult.nonce,
+      transactionIndex: txResult.transactionIndex,
     };
   }
 
@@ -138,23 +226,23 @@ export class Etherscan {
     const params = this.getTokenBalanceParams(contractAddress, address, tag);
     const balanceUrl = `${this.baseUrl}?${params}`;
     const { result } = await this.limit.schedule(() =>
-      fetch(balanceUrl).then(res => res.json())
+      fetch(balanceUrl).then((res) => res.json())
     );
     return result;
   }
 
-  getTxList(address: string) {
+  getTxList(address: string): Promise<EtherscanResponse<EthTx[]>> {
     const url = `${this.baseUrl}?${this.getTxListParams(address)}`;
-    return this.limit.schedule(() => fetch(url).then(res => res.json()));
+    return this.limit.schedule(() => fetch(url).then((res) => res.json()));
   }
 
-  getTxListInternal(address: string) {
+  getTxListInternal(address: string): Promise<EtherscanResponse<InternalTx[]>> {
     const url = `${this.baseUrl}?${this.getTxListInternalParams(address)}`;
-    return this.limit.schedule(() => fetch(url).then(res => res.json()));
+    return this.limit.schedule(() => fetch(url).then((res) => res.json()));
   }
 
-  getErc20TxList(address: string) {
+  getErc20TxList(address: string): Promise<EtherscanResponse<Erc20Transfer[]>> {
     const url = `${this.baseUrl}?${this.getTokenTxParams(address)}`;
-    return this.limit.schedule(() => fetch(url).then(res => res.json()));
+    return this.limit.schedule(() => fetch(url).then((res) => res.json()));
   }
 }

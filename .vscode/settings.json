@@ -6,14 +6,20 @@
         "EINVOICE",
         "UUID",
         "YYYYMMDD",
+        "apikey",
         "bignumber",
         "coingecko",
+        "contractaddress",
         "crpyto",
         "envs",
         "ethereum",
         "etherscan",
         "filepath",
         "jsonpointer",
-        "marcj"
+        "marcj",
+        "tokenbalance",
+        "tokentx",
+        "txlistinternal",
+        "txreceipt"
     ]
 }

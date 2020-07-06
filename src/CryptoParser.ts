@@ -5,10 +5,15 @@ import { ShellString, mkdir } from "shelljs";
 import path from "path";
 import { plainToClass } from "@marcj/marshal";
 import { Config, PatternType } from "./config/Config";
-import { Posting, Cost, PostingPrice } from "./models/Posting";
+import { Posting, Cost } from "./models/Posting";
 import { Transaction } from "./models/Transaction";
 import { CryptoConfig, Connection } from "./config/CryptoConfig";
-import { EthTx, ERC20Transfer, Etherscan } from "./services/Etherscan";
+import {
+  Etherscan,
+  EthTx,
+  Erc20Transfer,
+  InternalTx,
+} from "./services/Etherscan";
 import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
 import {
   postingTransform,
@@ -31,9 +36,7 @@ export interface TokenMetadataMap {
   [symbol: string]: TokenMetadata;
 }
 
-interface EthTxMap {
-  [hash: string]: EthTx;
-}
+type EthTxMap = Record<string, EthTx>;
 
 export interface DateCoinMap {
   [date: string]: CoinMap;
@@ -152,10 +155,10 @@ export class CryptoParser {
 
   async normalizeTransfers(
     txMap: EthTxMap,
-    transfers: ERC20Transfer[],
-    internalTransfers: EthTx[],
+    transfers: Erc20Transfer[],
+    internalTransfers: InternalTx[],
     tokensMetadata: TokenMetadataMap
-  ): Promise<void> {
+  ): Promise<EthTx[]> {
     for (let i = 0; i < transfers.length; i++) {
       const transfer = transfers[i];
       console.log(`  process ERC20 tx (${i + 1} / ${transfers.length})`);
@@ -175,7 +178,7 @@ export class CryptoParser {
       }
 
       const tx = txMap[transfer.hash];
-      const duplicated = tx.transfers.some(
+      const duplicated = tx.erc20Transfers.some(
         (tr) =>
           tr.from === transfer.from &&
           tr.to === transfer.to &&
@@ -183,7 +186,7 @@ export class CryptoParser {
       );
 
       if (!duplicated) {
-        tx.transfers.push(transfer);
+        tx.erc20Transfers.push(transfer);
       }
     }
 
@@ -191,6 +194,10 @@ export class CryptoParser {
       const tx = txMap[transfer.hash];
       tx.internalTransfers.push(transfer);
     });
+
+    return [...Object.values(txMap)].sort(
+      (a, b) => parseInt(a.timeStamp) - parseInt(b.timeStamp)
+    );
   }
 
   getETHPostings(from: string, to: string, value: string): Posting[] {
@@ -222,7 +229,7 @@ export class CryptoParser {
     return postings;
   }
 
-  getInternalPostings(transfers: EthTx[]) {
+  getInternalPostings(transfers: InternalTx[]) {
     const { defaultAccount } = this.config;
     const postings: Posting[] = [];
     transfers.forEach((transfer) => {
@@ -263,7 +270,7 @@ export class CryptoParser {
     return postings;
   }
 
-  getERC20Postings(transfers: ERC20Transfer[]) {
+  getERC20Postings(transfers: Erc20Transfer[]) {
     const { defaultAccount, excludeCoins } = this.config;
     const postings: Posting[] = [];
     transfers.forEach((transfer) => {
@@ -405,13 +412,13 @@ export class CryptoParser {
 
   getNarration(tx: EthTx): string {
     let narration = "";
-    if (tx.transfers.length === 0) {
+    if (tx.erc20Transfers.length === 0) {
       if (tx.value === "0") {
         narration = "Contract Execution";
       } else {
         narration = "ETH Transfer";
       }
-    } else if (tx.transfers.length <= 1) {
+    } else if (tx.erc20Transfers.length <= 1) {
       narration = "ERC20 Transfer";
     } else {
       narration = "ERC20 Exchange";
@@ -423,7 +430,7 @@ export class CryptoParser {
   toBeanTx(tx: EthTx) {
     const {
       value,
-      transfers,
+      erc20Transfers,
       internalTransfers,
       from,
       to,
@@ -469,7 +476,7 @@ export class CryptoParser {
     }
 
     // ERC20 transfer or exchange
-    postings.push(...this.getERC20Postings(transfers));
+    postings.push(...this.getERC20Postings(erc20Transfers));
 
     // internal transfer
     postings.push(...this.getInternalPostings(internalTransfers));
@@ -499,22 +506,20 @@ export class CryptoParser {
 
       if (conn.type === "ethereum") {
         const address = conn.address.toLowerCase();
-        const txListRes: any = await this.etherscan.getTxList(address);
-        const tokenRes: any = await this.etherscan.getErc20TxList(address);
-        const txInternalRes: any = await this.etherscan.getTxListInternal(
-          address
-        );
+        const txListRes = await this.etherscan.getTxList(address);
+        const tokenRes = await this.etherscan.getErc20TxList(address);
+        const txInternalRes = await this.etherscan.getTxListInternal(address);
 
         // convert to map
-        txListRes.result.forEach((tx: any) => {
+        txListRes.result.forEach((tx: EthTx) => {
           if (!ethTxnMap[tx.hash]) {
             ethTxnMap[tx.hash] = tx;
-            tx.transfers = [];
+            tx.erc20Transfers = [];
             tx.internalTransfers = [];
           }
         });
 
-        await this.normalizeTransfers(
+        const txList = await this.normalizeTransfers(
           ethTxnMap,
           tokenRes.result,
           txInternalRes.result,
@@ -522,14 +527,12 @@ export class CryptoParser {
         );
 
         // get last balance
-        const lastTx = [tokenRes, txListRes]
-          .map((res) => res.result.slice().pop())
-          .sort((a, b) => parseInt(a.blockNumber) - parseInt(b.blockNumber))
-          .pop();
-
-        balances.push(
-          ...(await this.getBalances(lastTx, tokensMetadata, conn))
-        );
+        const lastTx = txList.slice().pop();
+        if (lastTx) {
+          balances.push(
+            ...(await this.getBalances(lastTx, tokensMetadata, conn))
+          );
+        }
       }
     }
 
