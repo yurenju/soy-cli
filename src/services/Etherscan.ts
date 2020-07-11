@@ -50,6 +50,20 @@ export interface EtherscanResponse<T> {
   result: T;
 }
 
+export interface GetAbiResponse extends EtherscanResponse<string> {
+  address: string;
+}
+
+export interface GetSourceResponse
+  extends EtherscanResponse<SourceCodeResult[]> {
+  address: string;
+}
+
+export interface SourceCodeResult {
+  ABI: string;
+  ContractName: string;
+}
+
 export interface RpcResponse<T> {
   jsonrpc: string;
   id: number;
@@ -157,6 +171,15 @@ export class Etherscan {
     }).toString();
   }
 
+  private getSourceCodeParams(address: string) {
+    return new URLSearchParams({
+      module: "contract",
+      action: "getsourcecode",
+      address,
+      apikey: this.apiKey,
+    }).toString();
+  }
+
   private getTxListInternalParams(address: string) {
     return new URLSearchParams({
       module: "account",
@@ -173,6 +196,17 @@ export class Etherscan {
       address,
       apikey: this.apiKey,
     }).toString();
+  }
+
+  async getSourceCode(address: string): Promise<GetSourceResponse> {
+    console.log(`    getting source code for address ${address}`);
+    const params = this.getSourceCodeParams(address);
+    const url = `${this.baseUrl}?${params}`;
+    const result: GetSourceResponse = await this.limit.schedule(() =>
+      fetch(url).then((res) => res.json())
+    );
+    result.address = address;
+    return result;
   }
 
   async getTransaction(hash: string): Promise<EthTx> {

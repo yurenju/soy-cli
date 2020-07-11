@@ -3,6 +3,7 @@ import moment from "moment";
 import BigNumber from "bignumber.js";
 import { ShellString, mkdir } from "shelljs";
 import path from "path";
+import { ethers, Contract } from "ethers";
 import { plainToClass } from "@marcj/marshal";
 import { Config, PatternType } from "./config/Config";
 import { Posting, Cost } from "./models/Posting";
@@ -13,6 +14,7 @@ import {
   EthTx,
   Erc20Transfer,
   InternalTx,
+  SourceCodeResult,
 } from "./services/Etherscan";
 import { CoinGecko, HistoryPrice } from "./services/CoinGecko";
 import {
@@ -22,6 +24,7 @@ import {
 } from "./Common";
 import { DATE_FORMAT, Balance } from "./models";
 import { Price } from "./models/Price";
+import { parseBytes32String, TransactionDescription } from "ethers/lib/utils";
 
 dotenv.config();
 
@@ -54,6 +57,7 @@ export class CryptoParser {
   config: CryptoConfig;
   etherscan: Etherscan;
   coingecko: CoinGecko;
+  contractSrcMap: Record<string, SourceCodeResult> = {};
 
   static command = "crypto";
   static options = ["-c, --config <config-file>"];
@@ -410,11 +414,63 @@ export class CryptoParser {
     });
   }
 
-  getNarration(tx: EthTx): string {
+  async getSymbol(contractAddress: string, abi: string): Promise<string> {
+    const provider = ethers.getDefaultProvider();
+    const contract = new Contract(contractAddress, abi, provider);
+    const rawSymbol: string = await contract.symbol();
+    return rawSymbol.indexOf("0x") === 0
+      ? parseBytes32String(rawSymbol)
+      : rawSymbol;
+  }
+
+  async getContractInput(
+    txHash: string,
+    abi: string
+  ): Promise<TransactionDescription> {
+    const provider = ethers.getDefaultProvider();
+    const inter = new ethers.utils.Interface(abi);
+    const realTx = await provider.getTransaction(txHash);
+    return inter.parseTransaction({
+      data: realTx.data,
+      value: realTx.value,
+    });
+  }
+
+  async getSpenderName(address: string): Promise<string> {
+    let spenderName = address;
+    if (this.contractSrcMap[address]) {
+      spenderName = this.contractSrcMap[address].ContractName;
+    } else {
+      const spenderContract = await this.etherscan.getSourceCode(address);
+      if (spenderContract.status === "1" && spenderContract.result.length > 0) {
+        spenderName = spenderContract.result[0].ContractName;
+        this.contractSrcMap[address] = spenderContract.result[0];
+      }
+    }
+
+    return spenderName;
+  }
+
+  async getNarration(tx: EthTx): Promise<string> {
     let narration = "";
+    const ethAmount = new BigNumber(tx.value).div(new BigNumber(10).pow(18));
     if (tx.erc20Transfers.length === 0) {
-      if (tx.value === "0") {
-        narration = "Contract Execution";
+      if (ethAmount.eq(0)) {
+        if (this.contractSrcMap[tx.to]) {
+          const abi = this.contractSrcMap[tx.to].ABI;
+          const contractName = this.contractSrcMap[tx.to].ContractName;
+          const input = await this.getContractInput(tx.hash, abi);
+
+          if (input.name === "approve") {
+            const tokenSymbol = await this.getSymbol(tx.to, abi);
+            const spenderName = await this.getSpenderName(input.args[0]);
+            narration = `${input.name} ${tokenSymbol} for ${spenderName}`;
+          } else {
+            narration = `Called ${contractName}.${input.name}()`;
+          }
+        } else {
+          narration = "Contract Execution";
+        }
       } else {
         const action = this.getConnection(tx.from) ? "Sent" : "Received";
         const amount = new BigNumber(tx.value)
@@ -422,7 +478,7 @@ export class CryptoParser {
           .toFixed(3);
         narration = `${action} ${amount} ETH`;
       }
-    } else if (tx.erc20Transfers.length <= 1) {
+    } else if (tx.erc20Transfers.length <= 1 && ethAmount.eq(0)) {
       const transfer = tx.erc20Transfers[0];
       const action = this.getConnection(transfer.from) ? "Sent" : "Received";
       const amount = new BigNumber(transfer.value).div(
@@ -433,7 +489,6 @@ export class CryptoParser {
       const from: string[] = [];
       const to: string[] = [];
 
-      const ethAmount = new BigNumber(tx.value).div(new BigNumber(10).pow(18));
       if (this.getConnection(tx.from) && ethAmount.gt(0)) {
         from.push(`${ethAmount.toFixed(3)} ETH`);
       }
@@ -455,12 +510,16 @@ export class CryptoParser {
       });
       // Exchange [3.0 ETH] -> [40 BAT]
       narration = `Exchange ${from} to ${to}`;
+
+      if (this.contractSrcMap[tx.to]) {
+        narration += ` on ${this.contractSrcMap[tx.to].ContractName}`;
+      }
     }
 
     return narration;
   }
 
-  toBeanTx(tx: EthTx) {
+  async toBeanTx(tx: EthTx): Promise<Transaction> {
     const {
       value,
       erc20Transfers,
@@ -483,7 +542,7 @@ export class CryptoParser {
 
     const val = new BigNumber(value).div(decimals).toString();
 
-    const narration = this.getNarration(tx);
+    const narration = await this.getNarration(tx);
     const beanTx = new Transaction({ date, narration });
     const { postings, metadata } = beanTx;
     metadata.tx = hash;
@@ -527,9 +586,47 @@ export class CryptoParser {
     return beanTx;
   }
 
+  async getContractSource(
+    txs: EthTx[],
+    erc20Transfers: Erc20Transfer[],
+    internalTransfers: InternalTx[]
+  ): Promise<Record<string, SourceCodeResult>> {
+    const contractSrcMap: Record<string, SourceCodeResult> = {};
+    const txMap: Record<string, boolean> = {};
+    txs.forEach((tx) => {
+      txMap[tx.from] = true;
+      txMap[tx.to] = true;
+    });
+    erc20Transfers.forEach((tx) => {
+      txMap[tx.from] = true;
+      txMap[tx.to] = true;
+      txMap[tx.contractAddress] = true;
+    });
+    internalTransfers.forEach((tx) => {
+      txMap[tx.from] = true;
+      txMap[tx.to] = true;
+    });
+
+    const tasks = Object.keys(txMap).map((address) =>
+      this.etherscan.getSourceCode(address)
+    );
+
+    const results = await Promise.all(tasks);
+    results.forEach((result) => {
+      if (
+        result.status === "1" &&
+        result.result.length > 0 &&
+        result.result[0].ContractName !== ""
+      ) {
+        contractSrcMap[result.address] = result.result[0];
+      }
+    });
+    return contractSrcMap;
+  }
+
   async roastBean(): Promise<string> {
     const { connections } = this.config;
-    const beanTxs: Transaction[] = [];
+    const ethTxs: Transaction[] = [];
     const ethTxnMap: EthTxMap = {};
     const balances = [];
     for (let i = 0; i < connections.length; i++) {
@@ -552,6 +649,12 @@ export class CryptoParser {
           }
         });
 
+        this.contractSrcMap = await this.getContractSource(
+          txListRes.result,
+          tokenRes.result,
+          txInternalRes.result
+        );
+
         const txList = await this.normalizeTransfers(
           ethTxnMap,
           tokenRes.result,
@@ -573,11 +676,12 @@ export class CryptoParser {
       (a, b) => parseInt(a.timeStamp) - parseInt(b.timeStamp)
     );
 
-    beanTxs.push(...txList.map((tx) => this.toBeanTx(tx)));
+    const beanTxs = await Promise.all(txList.map((tx) => this.toBeanTx(tx)));
+    ethTxs.push(...beanTxs);
 
-    await this.fillPrices(beanTxs);
+    await this.fillPrices(ethTxs);
     const prices = await this.getLatestPrices();
-    const directives = [...beanTxs, ...balances, ...prices];
+    const directives = [...ethTxs, ...balances, ...prices];
 
     return directives.map((dir) => dir.toString()).join("\n\n");
   }
