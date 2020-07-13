@@ -23,7 +23,6 @@
   "homepage": "https://github.com/yurenju/soy-cli",
   "devDependencies": {
     "@types/chai": "4.2.9",
-    "@types/joi": "14.3.4",
     "@types/js-yaml": "3.12.4",
     "@types/jsonpointer": "4.0.0",
     "@types/mocha": "7.0.1",
@@ -49,9 +48,7 @@
     "ethers": "5.0.4",
     "iconv-lite": "^0.5.0",
     "js-yaml": "3.13.1",
-    "json-ptr": "1.2.0",
     "jsonpointer": "4.0.1",
-    "minimist": "^1.2.5",
     "moment": "^2.24.0",
     "node-fetch": "2.6.0",
     "node-tw-e-invoice": "1.0.0",
