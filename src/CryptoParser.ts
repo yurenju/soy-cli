@@ -459,14 +459,20 @@ export class CryptoParser {
         if (this.contractSrcMap[tx.to]) {
           const abi = this.contractSrcMap[tx.to].ABI;
           const contractName = this.contractSrcMap[tx.to].ContractName;
-          const input = await this.getContractInput(tx.hash, abi);
 
-          if (input.name === "approve") {
-            const tokenSymbol = await this.getSymbol(tx.to, abi);
-            const spenderName = await this.getSpenderName(input.args[0]);
-            narration = `${input.name} ${tokenSymbol} for ${spenderName}`;
-          } else {
-            narration = `Called ${contractName}.${input.name}()`;
+          try {
+            const input = await this.getContractInput(tx.hash, abi);
+            if (input.name === "approve") {
+              const tokenSymbol = await this.getSymbol(tx.to, abi);
+              const spenderName = await this.getSpenderName(input.args[0]);
+              narration = `${input.name} ${tokenSymbol} for ${spenderName}`;
+            } else {
+              narration = `Called ${contractName}.${input.name}()`;
+            }
+          } catch (e) {
+            console.error(`Failed to parse transaction, hash: ${tx.hash}`);
+            console.error(e);
+            narration = "Contract Execution";
           }
         } else {
           narration = "Contract Execution";
