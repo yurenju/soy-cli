@@ -340,44 +340,45 @@ describe("CryptoParser", () => {
   });
 
   describe("getNarration()", () => {
-    it("get Exchange narration if transfers great than 1", () => {
+    it("get Exchange narration if transfers great than 1", async () => {
       const tx = createEthTx();
       tx.erc20Transfers.push(createTransfer(), createTransfer());
-      const narration = parser.getNarration(tx);
+      const narration = await parser.getNarration(tx);
       expect(narration).to.contain("Exchange");
     });
 
-    it("get ERC20 transfer narration if transfers is 1", () => {
-      const tx = createEthTx();
-      tx.erc20Transfers.push(createTransfer());
-      const narration = parser.getNarration(tx);
-      expect(narration).to.contain("Received");
-    });
-
-    it("get ETH transfer if no transfer and value is not zero", () => {
-      const tx = createEthTx();
-      tx.value = "20";
-      const narration = parser.getNarration(tx);
-      expect(narration).to.contain("Received");
-    });
-
-    it("get Contract Execution if value is not zero", () => {
+    it("get ERC20 transfer narration if transfers is 1", async () => {
       const tx = createEthTx();
       tx.value = "0";
-      const narration = parser.getNarration(tx);
+      tx.erc20Transfers.push(createTransfer());
+      const narration = await parser.getNarration(tx);
+      expect(narration).to.contain("Received");
+    });
+
+    it("get ETH transfer if no transfer and value is not zero", async () => {
+      const tx = createEthTx();
+      tx.value = "20";
+      const narration = await parser.getNarration(tx);
+      expect(narration).to.contain("Received");
+    });
+
+    it("get Contract Execution if value is not zero", async () => {
+      const tx = createEthTx();
+      tx.value = "0";
+      const narration = await parser.getNarration(tx);
       expect(narration).to.eq("Contract Execution");
     });
   });
 
   describe("toBeanTx()", () => {
-    it("has gas posting if from field if our address", () => {
+    it("has gas posting if from field if our address", async () => {
       const tx = createEthTx();
       const decimals = new BigNumber(10).pow(18);
       tx.from = "0x6344793a588c7b3076bf74562463998b2966ee91";
       tx.gasUsed = "3";
       tx.gasPrice = new BigNumber(4).multipliedBy(decimals).toString();
 
-      const bean = parser.toBeanTx(tx);
+      const bean = await parser.toBeanTx(tx);
       expect(bean.postings[0].amount).to.eq("12");
     });
   });
