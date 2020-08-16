@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@marcj/marshal": "2.1.13",
+    "@types/joi": "14.3.4",
     "@types/shelljs": "0.8.8",
     "bignumber.js": "9.0.0",
     "bottleneck": "2.19.5",
