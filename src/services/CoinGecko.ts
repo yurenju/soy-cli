@@ -22,12 +22,12 @@ export class CoinGecko {
 
   constructor(
     private readonly baseUrl = COINGECKO_BASE_URL,
-    minTime = 600,
+    minTime = 500,
     maxConcurrent = 1
   ) {
     this.limit = new Bottleneck({
       maxConcurrent,
-      minTime
+      minTime,
     });
   }
 
@@ -43,7 +43,7 @@ export class CoinGecko {
     return this.limit
       .schedule(() => {
         console.log(`fetching ${coinId} price at ${date} via coingecko`);
-        return fetch(url).then(res => res.json());
+        return fetch(url).then((res) => res.json());
       })
       .then((json: HistoryPrice) => {
         json.date = date;
