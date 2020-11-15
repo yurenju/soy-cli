@@ -45,6 +45,7 @@
     "bottleneck": "2.19.5",
     "commander": "4.1.0",
     "csv-parse": "^4.8.3",
+    "dot-prop": "4.2.1",
     "dotenv": "8.2.0",
     "ethers": "5.0.4",
     "iconv-lite": "^0.5.0",
