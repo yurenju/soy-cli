@@ -50,7 +50,7 @@
     "ethers": "5.0.4",
     "iconv-lite": "^0.5.0",
     "js-yaml": "3.13.1",
-    "jsonpointer": "4.0.1",
+    "jsonpointer": "5.0.0",
     "moment": "^2.24.0",
     "node-fetch": "2.6.1",
     "node-tw-e-invoice": "1.0.0",
