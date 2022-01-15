@@ -55,6 +55,6 @@
     "node-fetch": "2.6.1",
     "node-tw-e-invoice": "1.0.0",
     "reflect-metadata": "0.1.13",
-    "shelljs": "0.8.3"
+    "shelljs": "0.8.5"
   }
 }
